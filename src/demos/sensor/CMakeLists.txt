@@ -11,6 +11,7 @@ set(DEMOS
   demo_SEN_radar
   demo_SEN_tachometer
   demo_SEN_radar1
+  demo_SEN_TrackedJSON_Sim
 )
 
 # Demos that combine sensor simulation with vehicle dynamics
