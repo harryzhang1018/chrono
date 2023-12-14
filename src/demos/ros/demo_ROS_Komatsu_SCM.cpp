@@ -32,6 +32,12 @@
 #include "chrono/core/ChMathematics.h"
 #include "chrono/utils/ChUtilsCreators.h"
 
+#include "chrono_ros/ChROSManager.h"
+#include "chrono_ros/handlers/ChROSClockHandler.h"
+#include "chrono_ros/handlers/ChROSBodyHandler.h"
+#include "chrono_ros/handlers/vehicle/ChROSDriverInputsHandler.h"
+#include "chrono_ros/handlers/sensor/ChROSLidarHandler.h"
+
 #include "chrono_vehicle/ChConfigVehicle.h"
 #include "chrono_vehicle/ChVehicleModelData.h"
 
@@ -88,6 +94,7 @@ using namespace chrono::vehicle;
 using namespace chrono::sensor;
 using namespace chrono::collision;
 using namespace chrono::irrlicht;
+using namespace chrono::ros;
 
 using std::cout;
 using std::endl;
@@ -531,7 +538,37 @@ int main(int argc, char* argv[]) {
     lidar->PushFilter(chrono_types::make_shared<ChFilterXYZIAccess>());
     manager->AddSensor(lidar);
 
+    // Create CH:ROS Manager
+    // Create ROS manager
+    auto ros_manager = chrono_types::make_shared<ChROSManager>();
 
+    // Create a publisher for the simulation clock
+    // The clock automatically publishes on every tick and on topic /clock
+    auto clock_handler = chrono_types::make_shared<ChROSClockHandler>();
+    ros_manager->RegisterHandler(clock_handler);
+
+    // Create the publisher for the lidar
+    auto lidar_2d_topic_name = "~/output/lidar_2d/data/laser_scan";
+    auto lidar_2d_handler = chrono_types::make_shared<ChROSLidarHandler>(lidar, lidar_2d_topic_name, false);  // last parameter indicates whether to use LaserScan or PointCloud2
+    ros_manager->RegisterHandler(lidar_2d_handler);
+
+    // Create a subscriber to the driver inputs
+    auto driver_inputs_rate = 10;
+    auto driver_inputs_topic_name = "~/input/driver_inputs";
+    auto driver_inputs_handler =
+        chrono_types::make_shared<ChROSDriverInputsHandler>(driver_inputs_rate, driver, driver_inputs_topic_name);
+    ros_manager->RegisterHandler(driver_inputs_handler);
+
+
+    // Create a publisher for the vehicle state
+    auto vehicle_state_rate = 25;
+    auto vehicle_state_topic_name = "~/output/vehicle/state";
+    auto vehicle_state_handler = chrono_types::make_shared<ChROSBodyHandler>(
+        vehicle_state_rate, vehicle.GetChassisBody(), vehicle_state_topic_name);
+    ros_manager->RegisterHandler(vehicle_state_handler);
+
+    // Finally, initialize the ros manager
+    ros_manager->Initialize();
 
 // =============================================================================
 
@@ -583,6 +620,9 @@ int main(int argc, char* argv[]) {
     int step_number = 0;
     int render_frame = 0;
     int render_steps = (int)std::ceil(render_step_size / step_size);
+
+
+
     while (vis->Run()) {
         // Initialize simulation frame counter and simulation time
     
@@ -623,6 +663,8 @@ int main(int argc, char* argv[]) {
 
         // Update modules (process inputs from other modules)
         double time = vehicle.GetChTime();
+
+        ros_manager->Update(time,step_size);
         driver->Synchronize(time);
         terrain.Synchronize(time);
         vehicle.Synchronize(time, driver_inputs);
@@ -641,6 +683,8 @@ int main(int argc, char* argv[]) {
             break;
         }
 
+        if (!ros_manager->Update(time, step_size))
+            break;
         // Increment frame number
         step_number++;
     }

@@ -12,6 +12,7 @@ set(DEMOS
 if(ENABLE_MODULE_VEHICLE AND ENABLE_MODULE_VEHICLE_MODELS)
   set(DEMOS ${DEMOS}
     demo_ROS_vehicle
+    demo_ROS_Komatsu_SCM
   )
 endif()
 
