@@ -196,6 +196,7 @@ class Marder_SinglePin : public Vehicle_Model {
 // =============================================================================
 // Forward declarations
 // =============================================================================
+
 // =============================================================================
 // USER SETTINGS
 // =============================================================================
@@ -211,13 +212,13 @@ std::string rigidterrain_file("terrain/RigidPlane.json");
 //std::string rigidterrain_file("terrain/shimada/RigidPlane.json");
 
 // Terrain dimensions for SCM terrain
-double terrainLength = 100.0;  // size in X direction
-double terrainWidth = 100.0;    // size in Y direction
+double terrainLength = 20.0;  // size in X direction
+double terrainWidth = 20.0;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
 // Initial vehicle position
 // ChVector<> initLoc(0, 0, 0.9);  //demo dafault
-ChVector<> initLoc(0, 0, 0.6);
+ChVector<> initLoc(-5, 0, 0.6);
 
 // Initial vehicle orientation
 ChQuaternion<> initRot(1, 0, 0, 0);
@@ -392,108 +393,6 @@ int main(int argc, char* argv[]) {
     ChSystem* sys = vehicle.GetSystem();
     sys->SetNumThreads(nthreads,nthreads,1);
 
-    // Disable all contacts for vehicle chassis (if chassis collision was defined)
-    ////vehicle.SetChassisCollide(false);
-
-    // Disable only contact between chassis and track shoes (if chassis collision was defined)
-    ////vehicle.SetChassisVehicleCollide(false);
-
-    // Monitor contacts involving one of the sprockets.
-    ////vehicle.MonitorContacts(TrackedCollisionFlag::SPROCKET_LEFT | TrackedCollisionFlag::SPROCKET_RIGHT);
-
-    // Render contact normals and/or contact forces.
-    vehicle.SetRenderContactNormals(true);
-    ////vehicle.SetRenderContactForces(true, 1e-4);
-
-    // Create and initialize the powertrain system
-    auto engine = ReadEngineJSON(vehicle::GetDataFile(vehicle_model.EngineJSON()));
-    auto transmission = ReadTransmissionJSON(vehicle::GetDataFile(vehicle_model.TransmissionJSON()));
-    auto powertrain = chrono_types::make_shared<ChPowertrainAssembly>(engine, transmission);
-    vehicle.InitializePowertrain(powertrain);
-    auto driver = std::make_shared<ChDriver>(vehicle);
-    cout << "  Track assembly templates" << endl;
-    cout << "     Sprocket:   " << vehicle.GetTrackAssembly(LEFT)->GetSprocket()->GetTemplateName() << endl;
-    cout << "     Brake:      " << vehicle.GetTrackAssembly(LEFT)->GetBrake()->GetTemplateName() << endl;
-    cout << "     Idler:      " << vehicle.GetTrackAssembly(LEFT)->GetIdler()->GetTemplateName() << endl;
-    cout << "     Suspension: " << vehicle.GetTrackAssembly(LEFT)->GetTrackSuspension(0)->GetTemplateName() << endl;
-    cout << "     Track shoe: " << vehicle.GetTrackShoe(LEFT, 0)->GetTemplateName() << endl;
-    cout << "  Driveline type:    " << vehicle.GetDriveline()->GetTemplateName() << endl;
-    cout << "  Engine type:       " << engine->GetTemplateName() << endl;
-    cout << "  Transmission type: " << transmission->GetTemplateName() << endl;
-    cout << "  Vehicle mass:      " << vehicle.GetMass() << endl;
-
-    /*
-    // Create the rigid terrain
-    RigidTerrain terrain(vehicle.GetSystem(), vehicle::GetDataFile(rigidterrain_file));
-    terrain.Initialize();
-    */
-
-    // Create the SCM terrain
-    // === default ===
-    SCMTerrain terrain(vehicle.GetSystem());
-    terrain.SetSoilParameters(2e7,   // Bekker Kphi
-                              0,     // Bekker Kc
-                              1.1,   // Bekker n exponent
-                              0,     // Mohr cohesive limit (Pa)
-                              20,    // Mohr friction limit (degrees)
-                              0.01,  // Janosi shear coefficient (m)
-                              2e8,   // Elastic stiffness (Pa/m), before plastic yield
-                              3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
-    );
-    /*
-    // === sandy soil ===
-    SCMTerrain terrain(vehicle.GetSystem());
-    terrain.SetSoilParameters(500000,   // Bekker Kphi
-                              3000,     // Bekker Kc
-                              1.1,   // Bekker n exponent
-                              0,     // Mohr cohesive limit (Pa)
-                              30,    // Mohr friction limit (degrees)
-                              0.01,  // Janosi shear coefficient (m)
-                              4e7,   // Elastic stiffness (Pa/m), before plastic yield
-                              3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
-    );
-
-    // === clayey soil ===
-    SCMTerrain terrain(vehicle.GetSystem());
-    terrain.SetSoilParameters(814000,   // Bekker Kphi
-                              20680,     // Bekker Kc
-                              1.0,   // Bekker n exponent
-                              3500,     // Mohr cohesive limit (Pa)
-                              11,    // Mohr friction limit (degrees)
-                              0.025,  // Janosi shear coefficient (m)
-                              7.8e7,   // Elastic stiffness (Pa/m), before plastic yield
-                              3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
-    );
-
-    // === snow soil ===
-    SCMTerrain terrain(vehicle.GetSystem());
-    terrain.SetSoilParameters(149000,   // Bekker Kphi
-                              6160,     // Bekker Kc
-                              1.53,   // Bekker n exponent
-                              0,     // Mohr cohesive limit (Pa)
-                              23,    // Mohr friction limit (degrees)
-                              0.042,  // Janosi shear coefficient (m)
-                              4e7,   // Elastic stiffness (Pa/m), before plastic yield
-                              3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
-    );
-    */
-    ////terrain.SetPlotType(vehicle::SCMTerrain::PLOT_PRESSURE_YELD, 0, 30000.2);
-    terrain.SetPlotType(vehicle::SCMTerrain::PLOT_SINKAGE, 0, 0.15);
-
-
-    terrain.Initialize(terrainLength, terrainWidth, delta);
-    ////terrain.Initialize(GetChronoDataFile("vehicle/terrain/meshes/sim/SCMSlope.obj"), delta);
-    ////terrain.Initialize(GetChronoDataFile("vehicle/terrain/meshes/sim/dem.obj"), delta);
-
-    terrain.GetMesh()->SetWireframe(true);
-
-    auto vis_mat = chrono_types::make_shared<ChVisualMaterial>();
-    vis_mat->SetSpecularColor({.1f, .1f, .1f});
-    vis_mat->SetRoughness(1);
-    vis_mat->SetKdTexture(GetChronoDataFile("sensor/textures/grass_texture.jpg"));
-    terrain.GetMesh()->AddMaterial(vis_mat);
-
-    // Add obstacles and path
     // initialize ROCK mesh
     std::string rock1_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock1.obj");
     double scale_ratio = 0.8;
@@ -541,7 +440,7 @@ int main(int argc, char* argv[]) {
     // Create ChBodyEasyBox objects at specified positions
     for (const auto& pos : positions) {
         auto box_body = chrono_types::make_shared<chrono::ChBodyEasyBox>(0.1, 0.1, 0.0001, 1000, true, false);
-        box_body->SetPos(chrono::ChVector<>(std::get<0>(pos), std::get<1>(pos), 0.5));
+        box_body->SetPos(chrono::ChVector<>(std::get<0>(pos), std::get<1>(pos), 0));
         box_body->SetBodyFixed(true);
 
         // Set visual material for the box
@@ -584,6 +483,36 @@ int main(int argc, char* argv[]) {
         sys->Add(rock_Body);
     }
 
+    // Create and initialize the powertrain system
+    auto engine = ReadEngineJSON(vehicle::GetDataFile(vehicle_model.EngineJSON()));
+    auto transmission = ReadTransmissionJSON(vehicle::GetDataFile(vehicle_model.TransmissionJSON()));
+    auto powertrain = chrono_types::make_shared<ChPowertrainAssembly>(engine, transmission);
+    vehicle.InitializePowertrain(powertrain);
+    auto driver = std::make_shared<ChDriver>(vehicle);
+    cout << "  Track assembly templates" << endl;
+    cout << "     Sprocket:   " << vehicle.GetTrackAssembly(LEFT)->GetSprocket()->GetTemplateName() << endl;
+    cout << "     Brake:      " << vehicle.GetTrackAssembly(LEFT)->GetBrake()->GetTemplateName() << endl;
+    cout << "     Idler:      " << vehicle.GetTrackAssembly(LEFT)->GetIdler()->GetTemplateName() << endl;
+    cout << "     Suspension: " << vehicle.GetTrackAssembly(LEFT)->GetTrackSuspension(0)->GetTemplateName() << endl;
+    cout << "     Track shoe: " << vehicle.GetTrackShoe(LEFT, 0)->GetTemplateName() << endl;
+    cout << "  Driveline type:    " << vehicle.GetDriveline()->GetTemplateName() << endl;
+    cout << "  Engine type:       " << engine->GetTemplateName() << endl;
+    cout << "  Transmission type: " << transmission->GetTemplateName() << endl;
+    cout << "  Vehicle mass:      " << vehicle.GetMass() << endl;
+
+    // Create the rigid terrain
+    RigidTerrain terrain(vehicle.GetSystem(), vehicle::GetDataFile(rigidterrain_file));
+    terrain.Initialize();
+
+    // auto vis_mat = chrono_types::make_shared<ChVisualMaterial>();
+    // vis_mat->SetSpecularColor({.1f, .1f, .1f});
+    // vis_mat->SetRoughness(1);
+    // vis_mat->SetKdTexture(GetChronoDataFile("sensor/textures/grass_texture.jpg"));
+    //terrain.GetMesh()->AddMaterial(vis_mat);
+
+    // Add obstacles
+
+
     // Compatibility checks
     if (vehicle.HasBushings()) {
         if (contact_method == ChContactMethod::NSC) {
@@ -596,9 +525,9 @@ int main(int argc, char* argv[]) {
     auto manager = chrono_types::make_shared<ChSensorManager>(vehicle.GetSystem());
     float intensity = .5;
     manager->scene->AddPointLight({2, 2.5, 100}, {intensity, intensity, intensity}, 5000);
-    manager->scene->AddPointLight({9, 2.5, 100}, {intensity, intensity, intensity}, 5000);
-    manager->scene->AddPointLight({16, 2.5, 100}, {intensity, intensity, intensity}, 5000);
-    manager->scene->AddPointLight({23, 2.5, 100}, {intensity, intensity, intensity}, 5000);
+    // manager->scene->AddPointLight({9, 2.5, 100}, {intensity, intensity, intensity}, 5000);
+    // manager->scene->AddPointLight({16, 2.5, 100}, {intensity, intensity, intensity}, 5000);
+    // manager->scene->AddPointLight({23, 2.5, 100}, {intensity, intensity, intensity}, 5000);
 
 
 
