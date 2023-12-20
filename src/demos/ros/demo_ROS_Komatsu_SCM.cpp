@@ -276,7 +276,7 @@ const std::string sens_dir = out_dir + "/SENSOR_OUTPUT/";
 const std::string lidar_dir = out_dir + "/SENSOR_OUTPUT/";
 
 // Visualization output
-bool img_output = false;
+bool img_output = true;
 
 // Setting for overturn prevention control
 bool ot_controller = false;
@@ -367,6 +367,14 @@ bool ReportTrackFailure(ChTrackedVehicle& veh, double threshold = 1e-2) {
     return false;
 }
 
+
+//sensor params
+unsigned int image_width = 1080;
+unsigned int image_height = 720;
+float fov = (float)CH_C_PI / 2.;
+int alias_factor = 1;
+float lag = 0.0f;
+CameraLensModelType lens_model = CameraLensModelType::PINHOLE;
 // =============================================================================
 
 int main(int argc, char* argv[]) {
@@ -496,7 +504,7 @@ int main(int argc, char* argv[]) {
     // Add obstacles and path
     // initialize ROCK mesh
     std::string rock1_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock1.obj");
-    double scale_ratio = 0.8;
+    double scale_ratio = 2.5;
     auto mesh = geometry::ChTriangleMeshConnected::CreateFromWavefrontFile(rock1_obj_path, false, true);
 
     mesh->Transform(ChVector<>(0, 0, 0.1), ChMatrix33<>(scale_ratio));  // scale to a different size
@@ -541,7 +549,7 @@ int main(int argc, char* argv[]) {
     // Create ChBodyEasyBox objects at specified positions
     for (const auto& pos : positions) {
         auto box_body = chrono_types::make_shared<chrono::ChBodyEasyBox>(0.1, 0.1, 0.0001, 1000, true, false);
-        box_body->SetPos(chrono::ChVector<>(std::get<0>(pos), std::get<1>(pos), 0.5));
+        box_body->SetPos(chrono::ChVector<>(std::get<0>(pos), std::get<1>(pos), 0));
         box_body->SetBodyFixed(true);
 
         // Set visual material for the box
@@ -555,6 +563,8 @@ int main(int argc, char* argv[]) {
         sys->Add(box_body);
     }
 
+
+
     // Randomly shuffle the positions vector to select n unique positions
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -564,7 +574,7 @@ int main(int argc, char* argv[]) {
         double x = std::get<0>(positions[i]);
         double y = std::get<1>(positions[i]);
         ChQuaternion<> rock_rot = Q_from_AngX(CH_C_PI_2);
-        auto rock_pos = ChVector<>(x, y, 0);
+        auto rock_pos = ChVector<>(10, 0, 0);
         auto rock_Body = chrono_types::make_shared<ChBodyAuxRef>();
         rock_Body->SetFrame_COG_to_REF(ChFrame<>(cog, principal_inertia_rot));
 
@@ -604,7 +614,7 @@ int main(int argc, char* argv[]) {
 
     // Create a lidar and add it to the sensor manager
     // Create a lidar and add it to the sensor manager
-    auto offset_pose = chrono::ChFrame<double>({1.0, 0, -0.2}, Q_from_AngAxis(0, {0, 0, 1}));
+    auto offset_pose = chrono::ChFrame<double>({-4.0, 0.0, 0.5}, Q_from_AngAxis(0, {0, 0, 1}));
     auto lidar = chrono_types::make_shared<ChLidarSensor>(vehicle.GetChassis()->GetBody(),  // body lidar is attached to
                                                           10,                             // scanning rate in Hz
                                                           offset_pose,                    // offset pose
@@ -624,6 +634,24 @@ int main(int argc, char* argv[]) {
     lidar->PushFilter(chrono_types::make_shared<ChFilterXYZIAccess>());
     manager->AddSensor(lidar);
 
+
+    // Add camera
+    auto cam_pose = chrono::ChFrame<double>({-8.304, 0, 2.0}, Q_from_AngAxis(0.1, {0, 1.25, 0}));
+    auto cam = chrono_types::make_shared<ChCameraSensor>(vehicle.GetChassis()->GetBody(),         // body camera is attached to
+                                                            10,   // update rate in Hz
+                                                            cam_pose,  // offset pose
+                                                            image_width,   // image width
+                                                            image_height,  // image height
+                                                            fov,           // camera's horizontal field of view
+                                                            alias_factor,  // supersample factor for antialiasing
+                                                            lens_model,    // FOV
+                                                            false);        // use global illumination or not
+    cam->SetName(" Camera ");
+    cam->SetLag(0.f);
+    cam->SetCollectionWindow(0.0f);
+    //cam->PushFilter(chrono_types::make_shared<ChFilterVisualize>(image_width, image_height, "Camera"));
+    cam->PushFilter(chrono_types::make_shared<ChFilterSave>("./cam1/"));
+    manager->AddSensor(cam);
     // Create CH:ROS Manager
     // Create ROS manager
     auto ros_manager = chrono_types::make_shared<ChROSManager>();
@@ -658,25 +686,25 @@ int main(int argc, char* argv[]) {
 
 // =============================================================================
 
-    // Create the run-time visualization system
-    auto vis = chrono_types::make_shared<ChTrackedVehicleVisualSystemIrrlicht>();
-    vis->SetWindowTitle("JSON Tracked Vehicle Demo");
-    vis->SetChaseCamera(vehicle_model.CameraPoint(), 10, 2);
-    //vis->SetChaseCamera(vehicle_model.CameraPoint(), vehicle_model.CameraDistance(), 0.5);
-    vis->Initialize();
-    //vis->AddCamera(ChVector<>(0, 1.5, -2));
-    vis->SetCameraVertical(CameraVerticalDir::Z);
-    vis->AddLightDirectional();
-    vis->AddSkyBox();
-    vis->AddLogo();
-    // Initialize image output
-    if (img_output) {
-        if (!filesystem::create_directory(filesystem::path(img_dir))) {
-            std::cout << "Error creating directory " << img_dir << std::endl;
-            return 1;
-        }
-    }
-    vis->AttachVehicle(&vehicle);
+    // // Create the run-time visualization system
+    // auto vis = chrono_types::make_shared<ChTrackedVehicleVisualSystemIrrlicht>();
+    // vis->SetWindowTitle("JSON Tracked Vehicle Demo");
+    // vis->SetChaseCamera(vehicle_model.CameraPoint(), 10, 2);
+    // //vis->SetChaseCamera(vehicle_model.CameraPoint(), vehicle_model.CameraDistance(), 0.5);
+    // vis->Initialize();
+    // //vis->AddCamera(ChVector<>(0, 1.5, -2));
+    // vis->SetCameraVertical(CameraVerticalDir::Z);
+    // vis->AddLightDirectional();
+    // vis->AddSkyBox();
+    // vis->AddLogo();
+    // // Initialize image output
+    // if (img_output) {
+    //     if (!filesystem::create_directory(filesystem::path(img_dir))) {
+    //         std::cout << "Error creating directory " << img_dir << std::endl;
+    //         return 1;
+    //     }
+    // }
+    // vis->AttachVehicle(&vehicle);
 
     // Solver and integrator settings
     //double step_size = 1e-3;
@@ -708,24 +736,25 @@ int main(int argc, char* argv[]) {
     int render_steps = (int)std::ceil(render_step_size / step_size);
 
 
-
-    while (vis->Run()) {
+    double time = 0;
+    double t_end = 300;
+    while (time < t_end) {
         // Initialize simulation frame counter and simulation time
     
         // Render scene
-        if (step_number % render_steps == 0) {
-            vis->BeginScene();
-            vis->Render();
-            //tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
-            vis->EndScene();
+        // if (step_number % render_steps == 0) {
+        //     vis->BeginScene();
+        //     vis->Render();
+        //     //tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
+        //     vis->EndScene();
 
-            if (img_output && step_number % render_steps == 0) {
-                char filename[100];
-                sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
-                vis->WriteImageToFile(filename);
-                render_frame++;
-            }
-        }
+        //     if (img_output && step_number % render_steps == 0) {
+        //         char filename[100];
+        //         sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+        //         vis->WriteImageToFile(filename);
+        //         render_frame++;
+        //     }
+        // }
 
         //UserR8BufferPtr camera_data = cam->GetMostRecentBuffer<UserR8BufferPtr>();
 
@@ -733,8 +762,8 @@ int main(int argc, char* argv[]) {
         // Will render/save/filter automatically
         manager->Update();
 
-        driver -> SetSteering(0.5);
-        driver -> SetThrottle(1.0);
+        // driver -> SetSteering(0.5);
+        // driver -> SetThrottle(1.0);
         DriverInputs driver_inputs = driver->GetInputs();
 
 
@@ -748,19 +777,17 @@ int main(int argc, char* argv[]) {
         ////}
 
         // Update modules (process inputs from other modules)
-        double time = vehicle.GetChTime();
+        time = vehicle.GetChTime();
 
         ros_manager->Update(time,step_size);
         driver->Synchronize(time);
         terrain.Synchronize(time);
         vehicle.Synchronize(time, driver_inputs);
-        vis->Synchronize(time, driver_inputs);
 
         // Advance simulation for one timestep for all modules
         driver->Advance(step_size);
         terrain.Advance(step_size);
         vehicle.Advance(step_size);
-        vis->Advance(step_size);
 
         ////ReportTiming(*vehicle.GetSystem());
 
