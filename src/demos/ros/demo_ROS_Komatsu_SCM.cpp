@@ -649,8 +649,8 @@ int main(int argc, char* argv[]) {
     cam->SetName(" Camera ");
     cam->SetLag(0.f);
     cam->SetCollectionWindow(0.0f);
-    //cam->PushFilter(chrono_types::make_shared<ChFilterVisualize>(image_width, image_height, "Camera"));
-    cam->PushFilter(chrono_types::make_shared<ChFilterSave>("./cam1/"));
+    cam->PushFilter(chrono_types::make_shared<ChFilterVisualize>(image_width, image_height, "Camera"));
+    //cam->PushFilter(chrono_types::make_shared<ChFilterSave>("./cam1/"));
     manager->AddSensor(cam);
     // Create CH:ROS Manager
     // Create ROS manager
