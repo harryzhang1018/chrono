@@ -25,6 +25,7 @@ endif()
 
 if(ENABLE_MODULE_SENSOR)
   list(APPEND DEMOS demo_ROS_sensor)
+  list(APPEND DEMOS demo_ROS_dART)
 endif()
 
 # ------------------------------------------------------------------------------
