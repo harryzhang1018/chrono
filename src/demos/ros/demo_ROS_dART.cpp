@@ -9,7 +9,7 @@
 // http://projectchrono.org/license-chrono.txt.
 //
 // =============================================================================
-// Authors: Aaron Young
+// Authors: Harry Zhang, Aaron Young
 // =============================================================================
 //
 // Demo to show the use of Chrono::Vehicle with ROS
@@ -111,9 +111,9 @@ double step_size = 1e-3;
 int main(int argc, char* argv[]) {
     GetLog() << "Copyright (c) 2023 projectchrono.org\nChrono version: " << CHRONO_VERSION << "\n\n";
     // Initial vehicle location and orientation
-    double x = std::atof(argv[2]);
-    double y = std::atof(argv[3]);
-    double theta = std::atof(argv[4]);
+    double x = 0.0;
+    double y = 0.0;
+    double theta = 0.0;
     ChVector<> initLoc(x, y, 0.25);
     ChQuaternion<> initRot = Q_from_AngZ(theta);
     //SetChronoDataPath(CHRONO_DATA_DIR);
