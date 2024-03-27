@@ -112,6 +112,8 @@ class MySimpleTank {
         );
         sys.Add(truss);
         truss->SetPos(ChVector3d(mx + passo / 2, my + radiustrack, rlwidth / 2));
+        //truss->SetRot(QuatFromAngleY(CH_PI));
+        //truss->SetRot(QuatFromAngleX(-CH_PI/2));
         truss->SetMass(350);
         truss->SetInertiaXX(ChVector3d(13.8, 13.5, 10));
 
@@ -516,6 +518,40 @@ class MyEventReceiver : public IEventReceiver {
     IGUIScrollBar* scrollbar_throttleR;
 };
 
+void computeDrivingForces(MySimpleTank* atank, double throttle, double steering) {
+    // Factors (you can adjust these values according to your needs)
+    const double factor_th = 6.0; // Factor for throttle
+    const double factor_s = 4.0; // Factor for steering
+
+    // Clipping throttle and steering to their respective ranges
+    throttle = std::clamp(throttle, 0.0, 1.0);
+    steering = std::clamp(steering, -1.0, 1.0);
+
+    // Calculate magnitude based on throttle
+    double magnitude = throttle * factor_th;
+
+    double L_mag, R_mag;
+    // Calculate L_mag and R_mag based on the sign of steering
+    if (steering >= 0) {
+        // If steering is non-negative
+        L_mag = magnitude + steering * factor_s;
+        R_mag = magnitude - steering * factor_s;
+        L_mag = std::clamp(L_mag, 0.0, 6.0);
+        R_mag = std::clamp(R_mag, 0.0, 6.0);
+    } else {
+        // If steering is negative
+        L_mag = magnitude - steering * factor_s;
+        R_mag = magnitude + steering * factor_s;
+        L_mag = std::clamp(L_mag, 0.0, 6.0);
+        R_mag = std::clamp(R_mag, 0.0, 6.0);
+    }
+
+    auto mfun_L = std::static_pointer_cast<ChFunctionConst>(atank->link_motorLB->GetSpeedFunction());
+    mfun_L->SetConstant(L_mag);
+    auto mfun_R = std::static_pointer_cast<ChFunctionConst>(atank->link_motorRB->GetSpeedFunction());
+    mfun_R->SetConstant(R_mag);
+}
+
 //
 // This is the program which is executed
 //
@@ -543,7 +579,7 @@ int main(int argc, char* argv[]) {
     // ..some obstacles on the ground:
     auto obst_mat = chrono_types::make_shared<ChContactMaterialNSC>();
 
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 0; i++) {
         auto my_obstacle = chrono_types::make_shared<ChBodyEasyBox>(
             0.6 * (1 - 0.4 * ChRandom::Get()), 0.08, 0.3 * (1 - 0.4 * ChRandom::Get()), 1000, true, true, obst_mat);
         my_obstacle->SetMass(3);
@@ -566,11 +602,13 @@ int main(int argc, char* argv[]) {
     vis->AddCamera(ChVector3d(0, 0, -6), ChVector3d(-2, 2, 0));
     vis->AddTypicalLights();
 
-    // Create some graphical-user-interface (GUI) items to show on the screen.
-    // This requires an event receiver object.
-    MyEventReceiver receiver(vis.get(), mytank);
-    // note how to add the custom event receiver to the default interface:
-    vis->AddUserEventReceiver(&receiver);
+    // // Create some graphical-user-interface (GUI) items to show on the screen.
+    // // This requires an event receiver object.
+    // MyEventReceiver receiver(vis.get(), mytank);
+    // // note how to add the custom event receiver to the default interface:
+    // vis->AddUserEventReceiver(&receiver);
+    auto veh_chassis = mytank->truss;
+    computeDrivingForces(mytank,1.0f,0.0f);
 
     // Solver settings
     sys.SetSolverType(ChSolver::Type::PSOR);
@@ -586,6 +624,9 @@ int main(int argc, char* argv[]) {
                         ChColor(0.3f, 0.3f, 0.3f), true);
 
         vis->EndScene();
+        // veh_chassis->SetRot(QuatFromAngleX(-CH_PI/2));
+        std::cout<<"vehicle pos: "<<veh_chassis->GetPos()<<std::endl;
+        
         sys.DoStepDynamics(timestep);
         realtime_timer.Spin(timestep);
     }
