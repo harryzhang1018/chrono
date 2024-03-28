@@ -114,6 +114,8 @@ class MySimpleTank {
         truss->SetPos(ChVector3d(mx + passo / 2, my + radiustrack, rlwidth / 2));
         truss->SetRot(QuatFromAngleX(CH_PI/2));
         //truss->SetRot(QuatFromAngleX(CH_PI/2));
+        //truss->SetRot(QuatFromAngleY(CH_PI));
+        //truss->SetRot(QuatFromAngleX(-CH_PI/2));
         truss->SetMass(350);
         truss->SetInertiaXX(ChVector3d(13.8, 13.5, 10));
 
