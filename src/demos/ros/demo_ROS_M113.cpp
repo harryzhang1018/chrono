@@ -25,7 +25,40 @@
 #include "chrono_vehicle/driver/ChPathFollowerDriver.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
 #include "chrono_vehicle/utils/ChVehiclePath.h"
+#include "chrono/physics/ChBodyEasy.h"
 #include "chrono_vehicle/output/ChVehicleOutputASCII.h"
+
+#include "chrono_sensor/ChSensorManager.h"
+#include "chrono_sensor/sensors/Sensor.h"
+#include "chrono_sensor/sensors/ChCameraSensor.h"
+#include "chrono_sensor/sensors/ChNoiseModel.h"
+#include "chrono_sensor/sensors/ChGPSSensor.h"
+#include "chrono_sensor/sensors/ChIMUSensor.h"
+#include "chrono_sensor/sensors/ChLidarSensor.h"
+#include "chrono_sensor/sensors/ChCameraSensor.h"
+#include "chrono_sensor/filters/ChFilterSave.h"
+#include "chrono_sensor/ChSensorManager.h"
+#include "chrono_sensor/filters/ChFilterAccess.h"
+#include "chrono_sensor/filters/ChFilterPCfromDepth.h"
+#include "chrono_sensor/filters/ChFilterVisualize.h"
+#include "chrono_sensor/filters/ChFilterVisualizePointCloud.h"
+#include "chrono_sensor/filters/ChFilterLidarReduce.h"
+#include "chrono_sensor/filters/ChFilterLidarNoise.h"
+#include "chrono_sensor/filters/ChFilterSavePtCloud.h"
+#include "chrono_sensor/filters/ChFilterCameraNoise.h"
+#include "chrono_sensor/filters/ChFilterImageOps.h"
+#include "chrono_sensor/sensors/Sensor.h"
+#include "chrono_sensor/filters/ChFilterRadarVisualizeCluster.h"
+#include "chrono_sensor/filters/ChFilterRadarXYZReturn.h"
+#include "chrono_sensor/filters/ChFilterRadarXYZVisualize.h"
+
+#include "chrono_ros/ChROSManager.h"
+#include "chrono_ros/handlers/ChROSClockHandler.h"
+#include "chrono_ros/handlers/sensor/ChROSLidarHandler.h"
+#include "chrono_ros/handlers/ChROSBodyHandler.h"
+#include "chrono_ros/handlers/vehicle/ChROSDriverInputsHandler.h"
+
+#include "chrono/physics/ChInertiaUtils.h"
 
 #include "chrono_models/vehicle/m113/M113.h"
 
@@ -47,6 +80,8 @@ using namespace chrono::vsg3d;
 
 using namespace chrono;
 using namespace chrono::vehicle;
+using namespace chrono::ros;
+using namespace chrono::sensor;
 using namespace chrono::vehicle::m113;
 
 using std::cout;
@@ -72,7 +107,7 @@ bool fix_chassis = false;
 bool create_track = true;
 
 // Initial vehicle position
-ChVector3d initLoc(-40, 0, 0.8);
+ChVector3d initLoc(-0.0, 0, 0.8);
 
 // Initial vehicle orientation
 ChQuaternion<> initRot(1, 0, 0, 0);
@@ -85,16 +120,6 @@ double terrainHeight = 0;
 double terrainLength = 200.0;  // size in X direction
 double terrainWidth = 200.0;   // size in Y direction
 
-// Specification of vehicle inputs
-enum class DriverMode {
-    KEYBOARD,  // interactive (Irrlicht) driver
-    DATAFILE,  // inputs from data file
-    PATH       // drives in a straight line
-};
-std::string driver_file("M113/driver/Acceleration2.txt");  // used for mode=DATAFILE
-double target_speed = 5;                                   // used for mode=PATH
-
-DriverMode driver_mode = DriverMode::PATH;
 
 // Contact formulation (NSC or SMC)
 ChContactMethod contact_method = ChContactMethod::SMC;
@@ -262,39 +287,6 @@ int main(int argc, char* argv[]) {
     m113.SetRoadWheelVisualizationType(track_vis);
     m113.SetTrackShoeVisualizationType(track_vis);
 
-    // Disable gravity in this simulation
-    ////m113.GetSystem()->SetGravitationalAcceleration(ChVector3d(0, 0, 0));
-
-    // Change (SMC) contact force model
-    ////if (contact_method == ChContactMethod::SMC) {
-    ////
-    /// static_cast<ChSystemSMC*>(m113.GetSystem())->SetContactForceModel(ChSystemSMC::ContactForceModel::PlainCoulomb);
-    ////}
-
-    // --------------------------------------------------
-    // Control internal collisions and contact monitoring
-    // --------------------------------------------------
-
-    // Enable contact on all tracked vehicle parts, except the left sprocket
-    ////vehicle.EnableCollision(TrackedCollisionFlag::ALL & (~TrackedCollisionFlag::SPROCKET_LEFT));
-
-    // Disable contact for all tracked vehicle parts
-    ////vehicle.EnableCollision(TrackedCollisionFlag::NONE);
-
-    // Disable all contacts for vehicle chassis (if chassis collision was defined)
-    ////vehicle.SetChassisCollide(false);
-
-    // Disable only contact between chassis and track shoes (if chassis collision was defined)
-    ////vehicle.SetChassisVehicleCollide(false);
-
-    // Monitor internal contacts for the chassis, left sprocket, left idler, and first shoe on the left track.
-    ////vehicle.MonitorContacts(TrackedCollisionFlag::CHASSIS | TrackedCollisionFlag::SPROCKET_LEFT |
-    ////                        TrackedCollisionFlag::SHOES_LEFT | TrackedCollisionFlag::IDLER_LEFT);
-
-    // Monitor only contacts involving the chassis.
-    ////vehicle.MonitorContacts(TrackedCollisionFlag::CHASSIS);
-
-    // Monitor contacts involving one of the sprockets.
     vehicle.MonitorContacts(TrackedCollisionFlag::SPROCKET_LEFT | TrackedCollisionFlag::SPROCKET_RIGHT);
 
     // Monitor only contacts involving the left idler.
@@ -399,15 +391,135 @@ int main(int argc, char* argv[]) {
     auto patch_mat = minfo.CreateMaterial(contact_method);
     auto patch = terrain.AddPatch(patch_mat, CSYSNORM, terrainLength, terrainWidth);
     patch->SetColor(ChColor(0.5f, 0.8f, 0.5f));
-    patch->SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+    patch->SetTexture(vehicle::GetDataFile("terrain/textures/grass.jpg"), 200, 200);
     terrain.Initialize();
 
     // --------------------------------
-    // Add fixed and/or falling objects
+    // Add obstacle objects
     // --------------------------------
+    // Add path to follow:
+    // Function to read and parse the CSV file
+    std::vector<std::tuple<double, double, double, double>> positions;
+    std::string directoryPath = "/sbel/Desktop/waypoints_paths/";
+    std::string csvFile = directoryPath + argv[1] + ".csv"; // Replace with CSV file path
+    std::ifstream file(csvFile);
+    if (!file.is_open()) {
+        std::cerr << "Error: Unable to open CSV file." << std::endl;
+        return 1;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        double x, y, z, w;
+        char delimiter;
+        if (ss >> x >> delimiter >> y >> delimiter >> z >> delimiter >> w) {
+            positions.emplace_back(x, y, z, w);
+        } else {
+            std::cerr << "Error: Invalid CSV format in line: " << line << std::endl;
+            return 1;
+        }
+    }
+    // Add color to path
+    // Define visual material (replace with your material setup)
+    auto vis_mat_path = chrono_types::make_shared<chrono::ChVisualMaterial>();
+    vis_mat_path->SetDiffuseColor(chrono::ChColor(0.0f, 1.0f, 0.0f));
+    // Create ChBodyEasyBox objects at specified positions
+    for (const auto& pos : positions) {
+        auto box_body = chrono_types::make_shared<ChBodyEasyBox>(0.1, 0.1, 0.0001, 1000, true, false);
+        box_body->SetPos(ChVector3d(std::get<0>(pos), std::get<1>(pos), 0.2));
+        box_body->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/blue.png"));
+        box_body->SetFixed(true);
+        m113.GetSystem()->Add(box_body);
+    }
 
-    ////AddFixedObstacles(m113.GetSystem());
-    ////AddFallingObjects(m113.GetSystem());
+
+    // Obstacles
+    std::vector<std::shared_ptr<ChBodyAuxRef>> rocks;
+    std::shared_ptr<ChContactMaterial> rockSufaceMaterial = ChContactMaterial::DefaultMaterial(m113.GetSystem()->GetContactMethod());
+    // Randomly shuffle the positions vector to select n unique positions
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(positions.begin(), positions.end(), gen);
+    // Uniform distribution from -1 to 1
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
+    int n = std::atoi(argv[2]); // Number of boxes to add
+    for (int i = 0; i < n; ++i) {
+        double x = std::get<0>(positions[i]) + dis(gen);
+        double y = std::get<1>(positions[i]) + dis(gen);
+        // ChQuaternion<> rock_rot = Q_from_AngX(CH_C_PI_2);
+        // auto rock_pos = ChVector<>(10, 0, 0);
+        // auto rock_Body = chrono_types::make_shared<ChBodyAuxRef>();
+        // rock_Body->SetFrame_COG_to_REF(ChFrame<>(cog, principal_inertia_rot));
+
+        // rock_Body->SetMass(mass * density);
+        // rock_Body->SetInertiaXX(density * principal_I);
+
+        // rock_Body->SetFrame_REF_to_abs(ChFrame<>(ChVector<>(rock_pos), ChQuaternion<>(rock_rot)));
+
+        // rock_Body->SetBodyFixed(true);
+        // rock_Body->SetCollide(false);
+
+        // auto rock_mesh = chrono_types::make_shared<ChTriangleMeshShape>();
+        // rock_mesh->SetMesh(mesh);
+        // rock_mesh->SetBackfaceCull(true);
+        // rock_Body->AddVisualShape(rock_mesh);
+
+        // sys->Add(rock_Body);
+
+
+        // create a rock
+        std::string rock_obj_path;
+        if (i % 3 == 0) {
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock1.obj");
+        } else if (i % 3 == 1) {
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock2.obj");
+        } else {
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock3.obj");
+        }
+        double scale_ratio = 0.15;
+        auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
+        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(scale_ratio));  // scale to a different size
+        rock_mmesh->RepairDuplicateVertexes(1e-9);                              // if meshes are not watertight
+
+        // compute mass inertia from mesh
+        double mmass;
+        ChVector3d mcog;
+        ChMatrix33<> minertia;
+        double mdensity = 8000;  // paramsH->bodyDensity;
+        rock_mmesh->ComputeMassProperties(true, mmass, mcog, minertia);
+        ChMatrix33<> principal_inertia_rot;
+        ChVector3d principal_I;
+        ChInertiaUtils::PrincipalInertia(minertia, principal_I, principal_inertia_rot);
+
+        // set the abs orientation, position and velocity
+        auto rock_Body = chrono_types::make_shared<ChBodyAuxRef>();
+        ChQuaternion<> rock_rot = QuatFromAngleX(CH_PI / 2);
+        ChVector3d rock_pos = ChVector3d(x, y, 0);
+        rock_Body->SetFrameCOMToRef(ChFrame<>(mcog, principal_inertia_rot));
+
+        rock_Body->SetMass(mmass * mdensity);  // mmass * mdensity
+        rock_Body->SetInertiaXX(mdensity * principal_I);
+
+        rock_Body->SetFrameRefToAbs(ChFrame<>(ChVector3d(rock_pos), ChQuaternion<>(rock_rot)));
+        m113.GetSystem()->Add(rock_Body);
+
+        rock_Body->SetFixed(true);
+
+        // auto rock_ct_shape = chrono_types::make_shared<ChCollisionShapeTriangleMesh>(rockSufaceMaterial, rock_mmesh,
+        //                                                                              false, false, 0.005);
+        // rock_Body->AddCollisionShape(rock_ct_shape);
+        // rock_Body->EnableCollision(false);
+
+        auto rock_mesh = chrono_types::make_shared<ChVisualShapeTriangleMesh>();
+        rock_mesh->SetMesh(rock_mmesh);
+        rock_mesh->SetBackfaceCull(true);
+        rock_Body->AddVisualShape(rock_mesh);
+
+        // m113.GetSystem()->Add(rock_Body);
+        //m113.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
+        //std::cout<<"done adding all the rocks"<<std::endl;
+    }
+    
 
     // -----------------------------------------
     // Create the vehicle run-time visualization
@@ -415,8 +527,55 @@ int main(int argc, char* argv[]) {
     // -----------------------------------------
 
     std::shared_ptr<ChVehicleVisualSystem> vis;
-    std::shared_ptr<ChDriver> driver;
+    auto driver = std::make_shared<ChDriver>(vehicle);
+    
+    // ----------------------------------------
+    // add sensor
+    auto sensor_manager = chrono_types::make_shared<ChSensorManager>(m113.GetSystem());
+    sensor_manager->scene->AddPointLight({100, 100, 100}, {2, 2, 2}, 500);
+    sensor_manager->scene->SetAmbientLight({0.1f, 0.1f, 0.1f});
+    // Create a lidar and add it to the sensor manager
+    chrono::ChFrame<double> offset_pose({0, 0, 3}, QuatFromAngleAxis(.0, {0, 1, 0}));
+    auto lidar = chrono_types::make_shared<ChLidarSensor>(vehicle.GetChassisBody(), 10.f, offset_pose, 600, 200, CH_PI,
+                                                          CH_PI / 12, -CH_PI / 6, 15.0f);
+    lidar->PushFilter(chrono_types::make_shared<ChFilterDIAccess>());
+    lidar->PushFilter(chrono_types::make_shared<ChFilterPCfromDepth>());
+    lidar->PushFilter(chrono_types::make_shared<ChFilterXYZIAccess>());
+    lidar->PushFilter(chrono_types::make_shared<ChFilterVisualizePointCloud>(640, 480, 1, "3D Lidar"));
+    sensor_manager->AddSensor(lidar);
 
+    // -----------
+    // Create ROS manager
+    auto ros_manager = chrono_types::make_shared<ChROSManager>("m113");
+
+    // Create a publisher for the simulation clock
+    // The clock automatically publishes on every tick and on topic /clock
+    auto clock_handler = chrono_types::make_shared<ChROSClockHandler>();
+    ros_manager->RegisterHandler(clock_handler);
+
+    // Create a subscriber to the driver inputs
+    auto driver_inputs_rate = 25;
+    auto driver_inputs_topic_name = "~/driver_inputs";
+    auto driver_inputs_handler =
+        chrono_types::make_shared<ChROSDriverInputsHandler>(driver_inputs_rate, driver, driver_inputs_topic_name);
+    ros_manager->RegisterHandler(driver_inputs_handler);
+
+    // Create a publisher for the vehicle state
+    auto vehicle_state_rate = 25;
+    auto vehicle_state_topic_name = "~/state";
+    auto vehicle_state_handler = chrono_types::make_shared<ChROSBodyHandler>(
+        vehicle_state_rate, vehicle.GetChassisBody(), vehicle_state_topic_name);
+    ros_manager->RegisterHandler(vehicle_state_handler);
+
+    // Create the publisher for the lidar
+    auto lidar_topic_name = "~/pointcloud";
+    auto lidar_handler = chrono_types::make_shared<ChROSLidarHandler>(lidar, lidar_topic_name);
+    ros_manager->RegisterHandler(lidar_handler);
+
+    // Finally, initialize the ros manager
+    ros_manager->Initialize();
+
+    //--- visualization
     switch (vis_type) {
         case ChVisualSystem::Type::IRRLICHT: {
 #ifdef CHRONO_IRRLICHT
@@ -432,18 +591,6 @@ int main(int argc, char* argv[]) {
             vis_irr->AddLogo();
 
             vis = vis_irr;
-
-            if (driver_mode == DriverMode::KEYBOARD) {
-                auto irr_driver = chrono_types::make_shared<ChInteractiveDriverIRR>(*vis_irr);
-                double steering_time = 0.5;  // time to go from 0 to +1 (or from 0 to -1)
-                double throttle_time = 1.0;  // time to go from 0 to +1
-                double braking_time = 0.3;   // time to go from 0 to +1
-                irr_driver->SetSteeringDelta(render_step_size / steering_time);
-                irr_driver->SetThrottleDelta(render_step_size / throttle_time);
-                irr_driver->SetBrakingDelta(render_step_size / braking_time);
-                irr_driver->SetGains(2, 5, 5);
-                driver = irr_driver;
-            }
 
 #endif
             break;
@@ -461,43 +608,10 @@ int main(int argc, char* argv[]) {
 
             vis = vis_vsg;
 
-            if (driver_mode == DriverMode::KEYBOARD) {
-                auto vsg_driver = chrono_types::make_shared<ChInteractiveDriverVSG>(*vis_vsg);
-                double steering_time = 0.5;  // time to go from 0 to +1 (or from 0 to -1)
-                double throttle_time = 1.0;  // time to go from 0 to +1
-                double braking_time = 0.3;   // time to go from 0 to +1
-                vsg_driver->SetSteeringDelta(render_step_size / steering_time);
-                vsg_driver->SetThrottleDelta(render_step_size / throttle_time);
-                vsg_driver->SetBrakingDelta(render_step_size / braking_time);
-                vsg_driver->SetGains(2, 5, 5);
-                driver = vsg_driver;
-            }
-
 #endif
             break;
         }
     }
-
-    switch (driver_mode) {
-        case DriverMode::DATAFILE: {
-            auto data_driver = chrono_types::make_shared<ChDataDriver>(vehicle, vehicle::GetDataFile(driver_file));
-            driver = data_driver;
-            break;
-        }
-        case DriverMode::PATH: {
-            auto endLoc = initLoc + initRot.Rotate(ChVector3d(terrainLength, 0, 0));
-            auto path = chrono::vehicle::StraightLinePath(initLoc, endLoc, 50);
-            auto path_driver = std::make_shared<ChPathFollowerDriver>(vehicle, path, "my_path", target_speed);
-            path_driver->GetSteeringController().SetLookAheadDistance(5.0);
-            path_driver->GetSteeringController().SetGains(0.5, 0, 0);
-            path_driver->GetSpeedController().SetGains(0.6, 0.3, 0);
-            driver = path_driver;
-            break;
-        }
-        default:
-            break;
-    }
-    driver->Initialize();
 
     if (vehicle.GetNumTrackShoes(LEFT) > 0)
         std::cout << "Track shoe type: " << vehicle.GetTrackShoe(LEFT, 0)->GetTemplateName() << std::endl;
@@ -597,7 +711,13 @@ int main(int argc, char* argv[]) {
         }
 
         // Current driver inputs
+        // driver->SetThrottle(0.0f);
+        // driver->SetSteering(0.0f);
+        // driver->SetBraking(1.0f);
         DriverInputs driver_inputs = driver->GetInputs();
+
+        //update sensor
+        sensor_manager->Update();
 
         // Update modules (process inputs from other modules)
         double time = vehicle.GetChTime();
@@ -624,66 +744,15 @@ int main(int argc, char* argv[]) {
             std::cout << time << "  chassis contact" << std::endl;
         }
 
+        // Update ROS managers
+        if (!ros_manager->Update(time, step_size))
+            break;
+
         // Increment frame number
         step_number++;
     }
 
-    vehicle.WriteContacts(out_dir + "/M113_contacts.out");
+    //vehicle.WriteContacts(out_dir + "/M113_contacts.out");
 
     return 0;
-}
-
-// =============================================================================
-void AddFixedObstacles(ChSystem* system) {
-    double radius = 2.2;
-    double length = 6;
-
-    auto obstacle = chrono_types::make_shared<ChBody>();
-    obstacle->SetPos(ChVector3d(10, 0, -1.8));
-    obstacle->SetFixed(true);
-    obstacle->EnableCollision(true);
-
-    // Visualization
-    auto shape = chrono_types::make_shared<ChVisualShapeCylinder>(radius, length);
-    shape->SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 10, 10);
-    obstacle->AddVisualShape(shape, ChFrame<>(VNULL, QuatFromAngleX(CH_PI_2)));
-
-    // Contact
-    ChContactMaterialData minfo;
-    minfo.mu = 0.9f;
-    minfo.cr = 0.01f;
-    minfo.Y = 2e7f;
-    auto obst_mat = minfo.CreateMaterial(system->GetContactMethod());
-
-    auto ct_shape = chrono_types::make_shared<ChCollisionShapeCylinder>(obst_mat, radius, length);
-    obstacle->AddCollisionShape(ct_shape, ChFrame<>(VNULL, QuatFromAngleX(CH_PI_2)));
-
-    system->AddBody(obstacle);
-}
-
-// =============================================================================
-void AddFallingObjects(ChSystem* system) {
-    double radius = 0.1;
-    double mass = 10;
-
-    auto ball = chrono_types::make_shared<ChBody>();
-    ball->SetMass(mass);
-    ball->SetInertiaXX(0.4 * mass * radius * radius * ChVector3d(1, 1, 1));
-    ball->SetPos(initLoc + ChVector3d(-3, 0, 2));
-    ball->SetRot(ChQuaternion<>(1, 0, 0, 0));
-    ball->SetPosDt(ChVector3d(3, 0, 0));
-    ball->SetFixed(false);
-
-    ChContactMaterialData minfo;
-    auto obst_mat = minfo.CreateMaterial(system->GetContactMethod());
-
-    ball->EnableCollision(true);
-    auto ct_shape = chrono_types::make_shared<ChCollisionShapeSphere>(obst_mat, radius);
-    ball->AddCollisionShape(ct_shape);
-
-    auto vis_shape = chrono_types::make_shared<ChVisualShapeSphere>(radius);
-    vis_shape->SetTexture(GetChronoDataFile("textures/bluewhite.png"));
-    ball->AddVisualShape(vis_shape);
-
-    system->AddBody(ball);
 }
