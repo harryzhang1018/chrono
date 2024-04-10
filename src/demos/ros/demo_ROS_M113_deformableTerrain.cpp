@@ -24,6 +24,7 @@
 #include "chrono_vehicle/driver/ChDataDriver.h"
 #include "chrono_vehicle/driver/ChPathFollowerDriver.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
+#include "chrono_vehicle/terrain/SCMTerrain.h"
 #include "chrono_vehicle/utils/ChVehiclePath.h"
 #include "chrono/physics/ChBodyEasy.h"
 #include "chrono_vehicle/output/ChVehicleOutputASCII.h"
@@ -107,7 +108,7 @@ bool fix_chassis = false;
 bool create_track = true;
 
 // Initial vehicle position
-ChVector3d initLoc(-0.0, -20, 0.8);
+ChVector3d initLoc(-0.0, -0.0, 0.8);
 
 // Initial vehicle orientation
 ChQuaternion<> initRot(1, 0, 0, 0);
@@ -119,6 +120,7 @@ ChQuaternion<> initRot(1, 0, 0, 0);
 double terrainHeight = 0;
 double terrainLength = 200.0;  // size in X direction
 double terrainWidth = 200.0;   // size in Y direction
+double terrainDelta = 0.05;    // SCM grid spacing
 
 
 // Contact formulation (NSC or SMC)
@@ -380,19 +382,49 @@ int main(int argc, char* argv[]) {
     ////vehicle.EnableCustomContact(chrono_types::make_shared<MyCustomContact>());
 
     // ------------------
-    // Create the terrain
+    // Create the rigid terrain
     // ------------------
 
-    RigidTerrain terrain(m113.GetSystem());
-    ChContactMaterialData minfo;
-    minfo.mu = 0.9f;
-    minfo.cr = 0.2f;
-    minfo.Y = 2e7f;
-    auto patch_mat = minfo.CreateMaterial(contact_method);
-    auto patch = terrain.AddPatch(patch_mat, CSYSNORM, terrainLength, terrainWidth);
-    patch->SetColor(ChColor(0.5f, 0.8f, 0.5f));
-    patch->SetTexture(vehicle::GetDataFile("terrain/textures/grass.jpg"), 200, 200);
-    terrain.Initialize();
+    // RigidTerrain terrain(m113.GetSystem());
+    // ChContactMaterialData minfo;
+    // minfo.mu = 0.9f;
+    // minfo.cr = 0.2f;
+    // minfo.Y = 2e7f;
+    // auto patch_mat = minfo.CreateMaterial(contact_method);
+    // auto patch = terrain.AddPatch(patch_mat, CSYSNORM, terrainLength, terrainWidth);
+    // patch->SetColor(ChColor(0.5f, 0.8f, 0.5f));
+    // patch->SetTexture(vehicle::GetDataFile("terrain/textures/grass.jpg"), 200, 200);
+    // terrain.Initialize();
+
+    // ------------------
+    // Create the deformable terrain
+    // ------------------
+    // Using sandy soil parameter for SCM terrain
+    // Detail for parameter, please refer the paper "https://www.researchgate.net/publication/326904884_Deformable_soil_with_adaptive_level_of_detail_for_tracked_and_wheeled_vehicles"
+    SCMTerrain terrain(m113.GetSystem());
+    terrain.SetSoilParameters(500000,   // Bekker Kphi
+                              3000,     // Bekker Kc
+                              1.1,      // Bekker n exponent
+                              0,        // Mohr cohesive limit (Pa)
+                              30,       // Mohr friction limit (degrees)
+                              0.01,     // Janosi shear coefficient (m)
+                              4e7,      // Elastic stiffness (Pa/m), before plastic yield
+                              3e4       // Damping (Pa s/m), proportional to negative vertical speed (optional)
+    );
+
+    // Dataplot on SCM terrain
+    // terrain.SetPlotType(vehicle::SCMTerrain::PLOT_PRESSURE_YELD, 0, 30000.2);
+    // terrain.SetPlotType(vehicle::SCMTerrain::PLOT_SINKAGE, 0, 0.15);
+
+    terrain.Initialize(terrainLength, terrainWidth, terrainDelta);
+    terrain.GetMesh()->SetWireframe(true);
+
+    // textures on SCM terrain
+    // auto vis_mat = chrono_types::make_shared<ChVisualMaterial>();
+    // vis_mat->SetSpecularColor({.1f, .1f, .1f});
+    // vis_mat->SetRoughness(1);
+    // vis_mat->SetKdTexture(GetChronoDataFile("sensor/textures/grass_texture.jpg"));
+    // terrain.GetMesh()->AddMaterial(vis_mat);
 
     // --------------------------------
     // Add obstacle objects
@@ -631,13 +663,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (povray_output) {
-        if (!filesystem::create_directory(filesystem::path(pov_dir))) {
-            std::cout << "Error creating directory " << pov_dir << std::endl;
-            return 1;
-        }
-        terrain.ExportMeshPovray(out_dir);
-    }
+    // if (povray_output) {
+    //     if (!filesystem::create_directory(filesystem::path(pov_dir))) {
+    //         std::cout << "Error creating directory " << pov_dir << std::endl;
+    //         return 1;
+    //     }
+    //     terrain.ExportMeshPovray(out_dir);
+    // }
 
     if (img_output) {
         if (!filesystem::create_directory(filesystem::path(img_dir))) {
