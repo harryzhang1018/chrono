@@ -46,6 +46,11 @@ const ChCoordsys<> ARTcar_Chassis::m_driverCsys(ChVector3d(0.0, 0.0, 0.0), ChQua
 // -----------------------------------------------------------------------------
 ARTcar_Chassis::ARTcar_Chassis(const std::string& name, bool fixed, CollisionType chassis_collision_type)
     : chrono::vehicle::ChRigidChassis(name, fixed) {
+    ChContactMaterialData minfo;
+    minfo.mu = 1.0f;
+    minfo.cr = 0.1f;
+    minfo.Y = 5e5f;
+    m_geometry.m_materials.push_back(minfo);
     m_body_inertia(0, 0) = m_body_inertiaXX.x();
     m_body_inertia(1, 1) = m_body_inertiaXX.y();
     m_body_inertia(2, 2) = m_body_inertiaXX.z();
@@ -65,13 +70,18 @@ ARTcar_Chassis::ARTcar_Chassis(const std::string& name, bool fixed, CollisionTyp
     m_geometry.m_has_primitives = true;
     m_geometry.m_vis_boxes.push_back(box1);
 
-    m_geometry.m_has_mesh = false;
+    m_geometry.m_has_mesh = true;
 
     m_geometry.m_has_collision = (chassis_collision_type != CollisionType::NONE);
     switch (chassis_collision_type) {
         case CollisionType::PRIMITIVES:
             m_geometry.m_coll_boxes.push_back(box1);
             break;
+        case CollisionType::MESH:{
+            ChVehicleGeometry::TrimeshShape trimesh(ChVector3d(), "artcar/chassis.obj", 0.005, 0);
+            m_geometry.m_coll_meshes.push_back(trimesh);
+            break;
+        }
         default:
             break;
     }

@@ -42,6 +42,7 @@
 #include "chrono_vehicle/ChVehicleModelData.h"
 #include "chrono_vehicle/wheeled_vehicle/vehicle/WheeledVehicle.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
+#include "chrono_vehicle/terrain/SCMTerrain.h"
 #include "chrono_vehicle/utils/ChUtilsJSON.h"
 #include "chrono_vehicle/ChDriver.h"
 #include "chrono_models/vehicle/artcar/ARTcar.h"
@@ -63,6 +64,7 @@
 #include "chrono_sensor/filters/ChFilterRadarVisualizeCluster.h"
 #include "chrono_sensor/filters/ChFilterRadarXYZReturn.h"
 #include "chrono_sensor/filters/ChFilterRadarXYZVisualize.h"
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 #include <chrono>
 #include <random>
@@ -88,12 +90,18 @@ VisualizationType wheel_vis_type = VisualizationType::NONE;
 // Collision system
 auto collision_system_type = ChCollisionSystem::Type::BULLET;
 
+
+// Tire contact material properties
+float Y_t = 1.0e6f;
+float cr_t = 0.1f;
+float mu_t = 0.8f;
+
 // Contact method
 ChContactMethod contact_method = ChContactMethod::NSC;
 // Collision type for chassis (PRIMITIVES, MESH, or NONE)
 CollisionType chassis_collision_type = CollisionType::MESH;
-// Type of tire model (RIGID, TMEASY)
-TireModelType tire_model = TireModelType::RIGID;
+// Type of tire model (RIGID_MESH, TMEASY)
+TireModelType tire_model = TireModelType::TMEASY;
 // JSON files for terrain
 std::string rigidterrain_file("terrain/RigidPlane.json");
 ////std::string rigidterrain_file("terrain/RigidMesh.json");
@@ -112,6 +120,81 @@ CameraLensModelType lens_model = CameraLensModelType::PINHOLE;
 double step_size = 1e-3;
 
 // =============================================================================
+// =============================================================================
+class MyCustomHandler : public ChROSHandler {
+public:
+    MyCustomHandler(double update_rate,const std::string& topic, chrono::vehicle::ChVehicle& vehicle)
+        : ChROSHandler(update_rate), m_topic(topic), m_vehicle(vehicle) {}
+
+    virtual bool Initialize(std::shared_ptr<ChROSInterface> interface) override {
+        std::cout << "Creating publisher for topic " << m_topic << " ..." << std::endl;
+        m_publisher = interface->GetNode()->create_publisher<std_msgs::msg::Float64MultiArray>(m_topic, 10);
+        return true;
+    }
+
+    virtual void Tick(double time) override {
+        double engine_speed = m_vehicle.GetEngine()->GetMotorSpeed();
+        double engine_tq = m_vehicle.GetEngine()->GetOutputMotorshaftTorque();
+        //std::cout << "Publishing array [" << engine_speed << ", " << engine_tq << "] ..." << std::endl;
+        std_msgs::msg::Float64MultiArray msg;
+        msg.data = {engine_speed, engine_tq};
+        m_publisher->publish(msg);
+    }
+
+private:
+    const std::string m_topic;
+    chrono::vehicle::ChVehicle& m_vehicle; // Store reference to the vehicle
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr m_publisher;
+};
+// =============================================================================
+// =============================================================================
+void InitializeTerrainParameters(SCMTerrain& terrain) {
+    // Seed the random number generator
+    std::srand(std::time(0));
+
+    // Generate a random number between 0 and 2
+    int randomSelection = std::rand() % 3;
+
+    switch (randomSelection) {
+        case 0:
+            terrain.SetSoilParameters(2e6,   // Bekker Kphi
+                                      0,     // Bekker Kc
+                                      1.1,   // Bekker n exponent
+                                      0,     // Mohr cohesive limit (Pa)
+                                      30,    // Mohr friction limit (degrees)
+                                      0.01,  // Janosi shear coefficient (m)
+                                      2e8,   // Elastic stiffness (Pa/m), before plastic yield
+                                      3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
+            );
+            break;
+        case 1:
+            terrain.SetSoilParameters(0.2e6,   // Bekker Kphi
+                                      0,       // Bekker Kc
+                                      1.1,     // Bekker n exponent
+                                      0,       // Mohr cohesive limit (Pa)
+                                      30,      // Mohr friction limit (degrees)
+                                      0.01,    // Janosi shear coefficient (m)
+                                      4e7,     // Elastic stiffness (Pa/m), before plastic yield
+                                      3e4      // Damping (Pa s/m), proportional to negative vertical speed (optional)
+            );
+            break;
+        case 2:
+            terrain.SetSoilParameters(5301e3,   // Bekker Kphi
+                                      102e3,    // Bekker Kc
+                                      0.793,    // Bekker n exponent
+                                      1.3e3,    // Mohr cohesive limit (Pa)
+                                      31.1,     // Mohr friction limit (degrees)
+                                      1.2e-2,   // Janosi shear coefficient (m)
+                                      4e8,      // Elastic stiffness (Pa/m), before plastic yield
+                                      3e4       // Damping (Pa s/m), proportional to negative vertical speed (optional)
+            );
+            break;
+        default:
+            // Default case if needed, though it should never be reached
+            break;
+    }
+}
+// =============================================================================
 
 int main(int argc, char* argv[]) {
     // Initial vehicle location and orientation
@@ -120,7 +203,7 @@ int main(int argc, char* argv[]) {
     float init_x = 0.0;
     float init_y = 0.0;
     // Initial vehicle position
-    ChVector3d initLoc(init_x, init_y, 0.8);
+    ChVector3d initLoc(init_x, init_y, 0.4);
     ChQuaternion<> initRot = QuatFromAngleZ(0.0f);
     ARTcar vehicle;
     vehicle.SetCollisionSystemType(collision_system_type);
@@ -131,8 +214,8 @@ int main(int argc, char* argv[]) {
     vehicle.SetInitPosition(ChCoordsys<>(initLoc, initRot));
     vehicle.SetTireType(tire_model);
     vehicle.SetTireStepSize(step_size);
-    vehicle.SetMaxMotorVoltageRatio(0.09f);
-    vehicle.SetStallTorque(0.3f);
+    vehicle.SetMaxMotorVoltageRatio(0.12f);
+    vehicle.SetStallTorque(0.4f);
     
     vehicle.SetTireRollingResistance(0.05f);
     vehicle.Initialize();
@@ -145,8 +228,25 @@ int main(int argc, char* argv[]) {
     vehicle.SetWheelVisualizationType(wheel_vis_type);
     vehicle.SetTireVisualizationType(tire_vis_type);
     vehicle.GetVehicle().SetWheelCollide(true);
+
+    // auto wheel_material = chrono_types::make_shared<ChContactMaterialSMC>();
+    // wheel_material->SetFriction(mu_t);
+    // wheel_material->SetYoungModulus(Y_t);
+    // wheel_material->SetRestitution(cr_t);
+    std::shared_ptr<ChContactMaterial> wheel_material = ChContactMaterial::DefaultMaterial(vehicle.GetSystem()->GetContactMethod());
+    wheel_material->SetFriction(0.7f);
+    double wradius = 0.08;
+    double wwidth = 0.08;
+    // Add a cylinder to represent the wheel hub.
+    auto cyl_shape = chrono_types::make_shared<ChCollisionShapeCylinder>(wheel_material, wradius, wwidth);
+    for (auto& axle : vehicle.GetVehicle().GetAxles()) {
+       axle->m_wheels[0]->GetSpindle()->AddCollisionShape(cyl_shape, ChFrame<>(VNULL, QuatFromAngleX(CH_PI_2)));
+       axle->m_wheels[1]->GetSpindle()->AddCollisionShape(cyl_shape, ChFrame<>(VNULL, QuatFromAngleX(CH_PI_2)));
+    }
+
     // Containing system
     auto system = vehicle.GetSystem();
+    system->SetNumThreads(std::min(8, ChOMP::GetNumProcs()));
     // system->SetCollisionSystemType(ChCollisionSystem::Type::BULLET);
     // --------------------------------
     // Add obstacle objects
@@ -284,7 +384,7 @@ int main(int argc, char* argv[]) {
         }
 
         auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
-        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(0.2));  // scale to a different size
+        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(0.11));  // scale to a different size
         rock_mmesh->RepairDuplicateVertexes(1e-9);                              // if meshes are not watertight
 
         // compute mass inertia from mesh
@@ -324,16 +424,25 @@ int main(int argc, char* argv[]) {
         // vehicle.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
         //std::cout<<"done adding all the rocks"<<std::endl;
     }
-    RigidTerrain terrain(vehicle.GetSystem());
-    ChContactMaterialData minfo;
-    minfo.mu = 0.9f + dis(gen)*0.2;
-    minfo.cr = 0.2f + dis(gen)*0.15;
-    minfo.Y = 2e7f;
-    auto patch_mat = minfo.CreateMaterial(contact_method);
-    auto patch = terrain.AddPatch(patch_mat, CSYSNORM, terrainLength, terrainWidth);
-    //patch->SetColor(ChColor(0.5f, 0.8f, 0.5f));
-    patch->SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
-    terrain.Initialize();
+    /// Rigid Terrain
+    // RigidTerrain terrain(vehicle.GetSystem());
+    // ChContactMaterialData minfo;
+    // minfo.mu = 0.9f + dis(gen)*0.2;
+    // minfo.cr = 0.2f + dis(gen)*0.15;
+    // minfo.Y = 2e7f;
+    // auto patch_mat = minfo.CreateMaterial(contact_method);
+    // auto patch = terrain.AddPatch(patch_mat, CSYSNORM, terrainLength, terrainWidth);
+    // //patch->SetColor(ChColor(0.5f, 0.8f, 0.5f));
+    // patch->SetTexture(vehicle::GetDataFile("terrain/textures/tile4.jpg"), 200, 200);
+    // terrain.Initialize();
+
+    ////// SCM Terrain
+    SCMTerrain terrain(system);
+    InitializeTerrainParameters(terrain);
+    double length = 35;
+    double width = 5;
+    terrain.Initialize(length, width, 0.02f);
+
 
     // Create the basic driver
     auto driver = std::make_shared<ChDriver>(vehicle.GetVehicle());
@@ -354,7 +463,7 @@ int main(int argc, char* argv[]) {
     sensor_manager->AddSensor(lidar);
 
     // Add camera
-    auto cam_pose = chrono::ChFrame<double>({-5.304, 0, 1.0}, QuatFromAngleAxis(0.1, {0, 1.25, 0}));
+    auto cam_pose = chrono::ChFrame<double>({-3.304, 0, 1.0}, QuatFromAngleAxis(0.1, {0, 1.25, 0}));
     auto cam = chrono_types::make_shared<ChCameraSensor>(vehicle.GetChassis()->GetBody(),  // body camera is attached to
                                                          10,                               // update rate in Hz
                                                          cam_pose,                         // offset pose
@@ -372,6 +481,12 @@ int main(int argc, char* argv[]) {
     sensor_manager->AddSensor(cam);
     sensor_manager->Update();
 
+    //------------
+    //Read engine power
+    auto engine_tq = vehicle.GetVehicle().GetEngine()->GetOutputMotorshaftTorque();
+    auto engine_speed = vehicle.GetVehicle().GetEngine()->GetMotorSpeed();
+    std::array<double, 2> eg_pw_array = {engine_speed, engine_tq};
+    
     // -----------
     // Create ROS manager
     auto ros_manager = chrono_types::make_shared<ChROSManager>("m113");
@@ -400,6 +515,10 @@ int main(int argc, char* argv[]) {
     auto lidar_handler = chrono_types::make_shared<ChROSLidarHandler>(lidar, lidar_topic_name);
     ros_manager->RegisterHandler(lidar_handler);
 
+    // Create custom handler to send engine power message
+    auto custom_handler = chrono_types::make_shared<MyCustomHandler>(25.0f,"~/engine_power",vehicle.GetVehicle());
+    ros_manager->RegisterHandler(custom_handler);
+
     // Finally, initialize the ros manager
     ros_manager->Initialize();
 
@@ -409,18 +528,23 @@ int main(int argc, char* argv[]) {
     vehicle.GetVehicle().EnableRealtime(true);
     while (time < t_end) {
         // Get driver inputs
-        driver->SetThrottle(0.7f);
+        driver->SetThrottle(0.8f);
+        //std::cout<<"set throttle"<<std::endl;
         DriverInputs driver_inputs = driver->GetInputs();
+        //std::cout<<"vehicle engine rmp:"<<vehicle.GetVehicle().GetEngine()->GetMotorSpeed()<<std::endl;
+        //std::cout<<"vehicle engine torque:"<<vehicle.GetVehicle().GetEngine()->GetOutputMotorshaftTorque()<<std::endl;        
         // Update modules (process inputs from other modules)
         time = vehicle.GetSystem()->GetChTime();
         driver->Synchronize(time);
-        vehicle.Synchronize(time, driver_inputs, terrain);
         terrain.Synchronize(time);
+        vehicle.Synchronize(time, driver_inputs, terrain);
+        
 
         // Advance simulation for one timestep for all modules
         driver->Advance(step_size);
-        vehicle.Advance(step_size);
         terrain.Advance(step_size);
+        vehicle.Advance(step_size);
+        
 
         // update sensor manager
         sensor_manager->Update();
@@ -431,3 +555,5 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+
