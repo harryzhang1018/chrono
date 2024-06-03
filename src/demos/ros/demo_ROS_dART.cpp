@@ -182,7 +182,6 @@ int main(int argc, char* argv[]) {
         auto box_body = chrono_types::make_shared<ChBodyEasyBox>(0.1, 0.1, 0.0001, 1000, true, false);
         box_body->SetPos(ChVector3d(std::get<0>(pos), std::get<1>(pos), 0.0));
         box_body->GetVisualShape(0)->SetTexture(GetChronoDataFile("textures/blue.png"));
-        box_body->SetFixed(true);
         vehicle.GetSystem()->Add(box_body);
     }
 
