@@ -369,6 +369,7 @@ int main(int argc, char* argv[]) {
     std::random_device sz_rd_lg;
     std::mt19937 gen_sz_lg(sz_rd_lg());
     std::uniform_real_distribution<> rand_size_lg(0.3, 0.5);
+    std::shuffle(positions.begin(), positions.end(), gen);
     int m = 10; // Number of big rocks
     for (int i = 0; i < m; ++i) {
         //double x = 6.0;
@@ -392,7 +393,7 @@ int main(int argc, char* argv[]) {
         }
 
         auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
-        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(0.11));  // scale to a different size
+        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(scale_ratio));  // scale to a different size
         rock_mmesh->RepairDuplicateVertexes(1e-9);                              // if meshes are not watertight
 
         // compute mass inertia from mesh
