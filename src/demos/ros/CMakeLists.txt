@@ -23,6 +23,7 @@ if(ENABLE_MODULE_VEHICLE AND ENABLE_MODULE_VEHICLE_MODELS)
     list(APPEND DEMOS demo_ROS_two_managers)
     list(APPEND DEMOS demo_ROS_dART)    
     list(APPEND DEMOS demo_ROS_dART_SCM)
+    list(APPEND DEMOS demo_ROS_dART_SCM_train)
   endif()
 endif()
 
