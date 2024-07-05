@@ -160,43 +160,35 @@ void InitializeTerrainParameters(SCMTerrain& terrain) {
     std::srand(std::time(0));
 
     // Generate a random number between 0(Soft) and 2(Hard)
-    // int randomSelection = std::rand() % 3;
-    int randomSelection = 0;
+    int randomSelection = std::rand() % 3;
+    // int randomSelection = 0;
 
     switch (randomSelection) {
         case 0:
-        // Soft
-        // ref1. https://github.com/projectchrono/chrono/blob/main/src/demos/vehicle/terrain/demo_VEH_SCMTerrain_WheeledVehicle.cpp
-        // ref2. https://github.com/projectchrono/chrono/blob/main/src/chrono_synchrono/agent/SynSCMTerrainAgent.h
-            terrain.SetSoilParameters(2e6,   // Bekker Kphi
+            terrain.SetSoilParameters(1e7,   // Bekker Kphi
                                       0,     // Bekker Kc
                                       1.1,   // Bekker n exponent
                                       0,     // Mohr cohesive limit (Pa)
-                                      30,    // Mohr friction limit (degrees)
+                                      20,    // Mohr friction limit (degrees)
                                       0.01,  // Janosi shear coefficient (m)
                                       2e8,   // Elastic stiffness (Pa/m), before plastic yield
                                       3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
             );
             break;
         case 1:
-        // Mid
-        // ref1. https://github.com/projectchrono/chrono/blob/main/src/demos/vehicle/terrain/demo_VEH_SCMTerrain_RigidTire.cpp
-        // ref2. https://github.com/projectchrono/chrono/blob/main/src/chrono_synchrono/agent/SynSCMTerrainAgent.h
-            terrain.SetSoilParameters(5301e3,   // Bekker Kphi
-                                      102e3,    // Bekker Kc
-                                      0.793,    // Bekker n exponent
-                                      1.3e3,    // Mohr cohesive limit (Pa)
-                                      31.1,     // Mohr friction limit (degrees)
-                                      1.2e-2,   // Janosi shear coefficient (m)
-                                      4e8,      // Elastic stiffness (Pa/m), before plastic yield
-                                      3e4       // Damping (Pa s/m), proportional to negative vertical speed (optional)
+            terrain.SetSoilParameters(2e7,   // Bekker Kphi
+                                      0,     // Bekker Kc
+                                      1.1,   // Bekker n exponent
+                                      0,     // Mohr cohesive limit (Pa)
+                                      20,    // Mohr friction limit (degrees)
+                                      0.01,  // Janosi shear coefficient (m)
+                                      2e8,   // Elastic stiffness (Pa/m), before plastic yield
+                                      3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
 
             );
             break;
         case 2:
-        // Hard
-        // ref1. https://github.com/projectchrono/chrono/blob/main/src/demos/vehicle/terrain/demo_VEH_SCMTerrain_TrackedVehicle.cpp
-            terrain.SetSoilParameters(2e7,   // Bekker Kphi
+            terrain.SetSoilParameters(4e7,   // Bekker Kphi
                                       0,     // Bekker Kc
                                       1.1,   // Bekker n exponent
                                       0,     // Mohr cohesive limit (Pa)
@@ -310,23 +302,13 @@ int main(int argc, char* argv[]) {
     vehicle.Initialize();
     //std::cout<<"hello"<<std::endl;
     
-    vehicle.SetChassisVisualizationType(VisualizationType::MESH);
+    vehicle.SetChassisVisualizationType(VisualizationType::PRIMITIVES);
     vehicle.SetSprocketVisualizationType(VisualizationType::NONE);
     vehicle.SetIdlerVisualizationType(VisualizationType::NONE);
     vehicle.SetSuspensionVisualizationType(VisualizationType::NONE);
     vehicle.SetIdlerWheelVisualizationType(VisualizationType::NONE);
     vehicle.SetRoadWheelVisualizationType(VisualizationType::NONE);
     vehicle.SetTrackShoeVisualizationType(VisualizationType::PRIMITIVES);
-
-    // VisualizationType track_vis =
-    //     (shoe_type == TrackShoeType::SINGLE_PIN) ? VisualizationType::MESH : VisualizationType::PRIMITIVES;
-    // vehicle.SetChassisVisualizationType(VisualizationType::NONE);
-    // vehicle.SetSprocketVisualizationType(VisualizationType::MESH);
-    // vehicle.SetIdlerVisualizationType(track_vis);
-    // vehicle.SetSuspensionVisualizationType(track_vis);
-    // vehicle.SetIdlerWheelVisualizationType(track_vis);
-    // vehicle.SetRoadWheelVisualizationType(track_vis);
-    // vehicle.SetTrackShoeVisualizationType(track_vis);
 
     // Containing system
     auto system = vehicle.GetSystem();
@@ -393,16 +375,17 @@ int main(int argc, char* argv[]) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::shuffle(positions.begin(), positions.end(), gen);
-    // Uniform distribution from -1 to 1
-    std::uniform_real_distribution<> dis(-2.0, 2.0);
+    // Uniform distribution from -1.5 to 1.5
+    std::uniform_real_distribution<> dis(-1.5, 1.5);
 
     std::random_device sz_rd;
     std::mt19937 gen_sz(sz_rd());
-    std::uniform_real_distribution<> rand_size_sm(0.4, 1.40);
+    std::uniform_real_distribution<> rand_size_sm(0.1, 1.10);
     int n = 1; // Number of training rocks
     for (int i = 0; i < n; ++i) {
         // Generate a random number between 0 and 2
         int rock_selection = std::rand() % 3;
+        // double y = 1.1f;
         double y = dis(gen);
         double x = 6.0f;
 
@@ -415,6 +398,7 @@ int main(int argc, char* argv[]) {
         } else {
             rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock3.obj");
         }
+        // double scale_ratio = 0.6f;
         double scale_ratio = rand_size_sm(gen_sz);
         auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
         rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(scale_ratio));  // scale to a different size
@@ -455,8 +439,8 @@ int main(int argc, char* argv[]) {
         rock_Body->AddVisualShape(rock_mesh);
 
         // vehicle.GetSystem()->Add(rock_Body);
-        //vehicle.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
-        //std::cout<<"done adding all the rocks"<<std::endl;
+        // vehicle.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
+        // std::cout<<"done adding all the rocks"<<std::endl;
     }
 
     // SCM Terrain with randomly selected terrain parameters
@@ -504,9 +488,9 @@ int main(int argc, char* argv[]) {
     sensor_manager->AddSensor(lidar);
 
     // Add camera
-    // View from behind vehicle
+    //// View from behind vehicle
     // auto cam_pose = chrono::ChFrame<double>({-6.304, 0, 1.0}, QuatFromAngleAxis(0.1, {0, 1.25, 0}));
-    // Bird's eye view cam pos.
+    //// Bird's eye view cam pos.
     auto cam_pose = chrono::ChFrame<double>({0, 0, 15.0}, QuatFromAngleAxis(1.57, {0, 1, 0}));
     auto cam = chrono_types::make_shared<ChCameraSensor>(vehicle.GetChassis()->GetBody(),  // body camera is attached to
                                                          15,                               // update rate in Hz
