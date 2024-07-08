@@ -380,7 +380,7 @@ int main(int argc, char* argv[]) {
 
     std::random_device sz_rd;
     std::mt19937 gen_sz(sz_rd());
-    std::uniform_real_distribution<> rand_size_sm(0.1, 1.10);
+    std::uniform_real_distribution<> rand_size_sm(0.1, 1.5);
     int n = 1; // Number of training rocks
     for (int i = 0; i < n; ++i) {
         // Generate a random number between 0 and 2
