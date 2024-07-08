@@ -556,9 +556,9 @@ int main(int argc, char* argv[]) {
     vehicle.GetVehicle().EnableRealtime(true);
     while (time < t_end) {
         // Get driver inputs
-        driver->SetThrottle(0.8f);
-        driver->SetSteering(0.0f);
-        driver->SetBraking(0.0f);
+        // driver->SetThrottle(0.8f);
+        // driver->SetSteering(0.0f);
+        // driver->SetBraking(0.0f);
         //std::cout<<"set throttle"<<std::endl;
         DriverInputs driver_inputs = driver->GetInputs();
         std::cout<<"vehicle engine rmp:"<<vehicle.GetVehicle().GetEngine()->GetMotorSpeed()<<std::endl;
