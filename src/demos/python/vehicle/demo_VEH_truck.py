@@ -22,8 +22,9 @@ chrono.SetChronoDataPath(chrono.GetChronoDataPath())
 veh.SetDataPath(chrono.GetChronoDataPath() + 'vehicle/')
 
 # Initial vehicle location and orientation
-initLoc = chrono.ChVector3d(0, 0, 0.5)
-initRot = chrono.ChQuaterniond(1, 0, 0, 0)
+initLoc = chrono.ChVector3d(4, 0, 0.5)
+initRot = chrono.QuatFromAngleZ(1.57)
+# initRot = chrono.ChQuaterniond(1, 0, 0, 0)
 
 # Visualization type for vehicle parts (PRIMITIVES, MESH, or NONE)
 chassis_vis_type = veh.VisualizationType_MESH
@@ -91,11 +92,14 @@ patch_mat.SetFriction(0.9)
 patch_mat.SetRestitution(0.01)
 terrain = veh.RigidTerrain(car.GetSystem())
 patch = terrain.AddPatch(patch_mat, 
-    chrono.ChCoordsysd(chrono.ChVector3d(0, 0, 0), chrono.QUNIT), 
-    terrainLength, terrainWidth)
-
-patch.SetTexture(veh.GetDataFile("terrain/textures/tile4.jpg"), 200, 200)
-patch.SetColor(chrono.ChColor(0.8, 0.8, 0.5))
+    chrono.ChCoordsysd(chrono.ChVector3d(0, 0, 0), chrono.QUNIT),
+    veh.GetDataFile('terrain/meshes/Highway_col.obj'),
+    True, 0.01, False)
+vis_mesh = chrono.ChTriangleMeshConnected().CreateFromWavefrontFile(veh.GetDataFile("terrain/meshes/Highway_vis.obj"), True, True)
+tri_mesh_shape = chrono.ChVisualShapeTriangleMesh()
+tri_mesh_shape.SetMesh(vis_mesh)
+tri_mesh_shape.SetMutable(False)
+patch.GetGroundBody().AddVisualShape(tri_mesh_shape)
 terrain.Initialize()
 
 
@@ -115,12 +119,16 @@ vis.AddSkyBox()
 vis.AttachVehicle(car.GetTractor())
 
 
-driver_data = veh.vector_Entry([veh.DataDriverEntry(0.0, 0.0, 0.0, 0.0), 
-                                veh.DataDriverEntry(0.1, 1.0, 0.0, 0.0),
-                                veh.DataDriverEntry(0.5, 1.0, 0.7, 0.0),
-                                 ])
-driver = veh.ChDataDriver(car.GetTractor(), driver_data)
-driver.Initialize()
+# Create the driver system
+driver = veh.ChInteractiveDriverIRR(vis)
+
+# Set the time response for steering and throttle keyboard inputs.
+steering_time = 1.0  # time to go from 0 to +1 (or from 0 to -1)
+throttle_time = 1.0  # time to go from 0 to +1
+braking_time = 0.3   # time to go from 0 to +1
+driver.SetSteeringDelta(render_step_size / steering_time)
+driver.SetThrottleDelta(render_step_size / throttle_time)
+driver.SetBrakingDelta(render_step_size / braking_time)
 
 driver.Initialize()
 
