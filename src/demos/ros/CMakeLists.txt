@@ -25,6 +25,7 @@ if(ENABLE_MODULE_VEHICLE AND ENABLE_MODULE_VEHICLE_MODELS)
     list(APPEND DEMOS demo_ROS_dART_SCM)
     list(APPEND DEMOS demo_ROS_dART_SCM_train)
     list(APPEND DEMOS demo_ROS_M113_train)
+    list(APPEND DEMOS demo_ROS_M113_test)
   endif()
 endif()
 

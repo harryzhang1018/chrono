@@ -273,8 +273,8 @@ int main(int argc, char* argv[]) {
     // float init_x = std::atof(argv[3]);
     // float init_y = std::atof(argv[4]);
     // float init_x = -5.0;
-    float init_x = -3.0;
-    float init_y = 0.0;
+    float init_x = -20.0;
+    float init_y = -30.0;
     ChVector3d initLoc(init_x, init_y, 0.8);
     ChQuaternion<> initRot(1, 0, 0, 0);
 
@@ -367,7 +367,7 @@ int main(int argc, char* argv[]) {
     }
 
 
-    // Obstacles
+        // Obstacles
     std::vector<std::shared_ptr<ChBodyAuxRef>> rocks;
     std::shared_ptr<ChContactMaterial> rockSufaceMaterial = ChContactMaterial::DefaultMaterial(vehicle.GetSystem()->GetContactMethod());
     rockSufaceMaterial->SetFriction(0.7f);
@@ -375,33 +375,31 @@ int main(int argc, char* argv[]) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::shuffle(positions.begin(), positions.end(), gen);
-    // Uniform distribution from -1.5 to 1.5
     std::uniform_real_distribution<> dis(-1.5, 1.5);
 
     std::random_device sz_rd;
     std::mt19937 gen_sz(sz_rd());
-    std::uniform_real_distribution<> rand_size_sm(0.1, 1.5);
-    int n = 1; // Number of training rocks
+    std::uniform_real_distribution<> rand_size_sm(1.0, 1.6);
+    int n = 3; // Number of big rocks
     for (int i = 0; i < n; ++i) {
-        // Generate a random number between 0 and 2
-        int rock_selection = std::rand() % 3;
-        // double y = 1.1f;
-        double y = dis(gen);
-        double x = 6.0f;
+        double x = std::get<0>(positions[i]) + dis(gen);
+        double y = std::get<1>(positions[i]) + dis(gen);
+
+        // double x = -12.0f;
+        // double y = -30.0f;
 
         // create a rock
         std::string rock_obj_path;
-        if (rock_selection == 0) {
+        if (i % 3 == 0) {
             rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock1.obj");
-        } else if (rock_selection == 1) {
+        } else if (i % 3 == 1) {
             rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock2.obj");
         } else {
             rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock3.obj");
         }
-        // double scale_ratio = 0.6f;
         double scale_ratio = rand_size_sm(gen_sz);
         auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
-        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(1.45f));  // scale to a different size
+        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(scale_ratio));  // scale to a different size
         rock_mmesh->RepairDuplicateVertexes(1e-9);                              // if meshes are not watertight
 
         // compute mass inertia from mesh
@@ -431,6 +429,76 @@ int main(int argc, char* argv[]) {
         auto rock_ct_shape = chrono_types::make_shared<ChCollisionShapeTriangleMesh>(rockSufaceMaterial, rock_mmesh,
                                                                                      false, false, 0.005);
         rock_Body->AddCollisionShape(rock_ct_shape);
+        rock_Body->EnableCollision(false);
+
+        auto rock_mesh = chrono_types::make_shared<ChVisualShapeTriangleMesh>();
+        rock_mesh->SetMesh(rock_mmesh);
+        rock_mesh->SetBackfaceCull(true);
+        rock_Body->AddVisualShape(rock_mesh);
+
+        // vehicle.GetSystem()->Add(rock_Body);
+        //vehicle.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
+        //std::cout<<"done adding all the rocks"<<std::endl;
+    }
+
+    // adding small rocks for avoidance purpose:
+    std::random_device sz_rd_lg;
+    std::mt19937 gen_sz_lg(sz_rd_lg());
+    std::uniform_real_distribution<> rand_size_lg(0.2, 0.7);
+    std::shuffle(positions.begin(), positions.end(), gen);
+    int m = 3; // Number of small rocks
+    for (int i = 0; i < m; ++i) {
+        // double x = 4.0;
+        double x = std::get<0>(positions[i]) + dis(gen);        
+        double y = std::get<1>(positions[i]) + dis(gen);
+        //double y = dis(gen);
+        // create a rock
+        std::string rock_obj_path;
+        
+        double scale_ratio = rand_size_lg(gen_sz_lg);
+
+        if (int(scale_ratio * 100) % 3 == 0) {
+            std::cout<<"use rock 1"<<std::endl;
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock1.obj");
+        } else if (int(scale_ratio*100) % 3 == 1) {
+            std::cout<<"use rock 2"<<std::endl;
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock2.obj");
+        } else {
+            std::cout<<"use rock 3"<<std::endl;
+            rock_obj_path = GetChronoDataFile("robot/curiosity/rocks/rock3.obj");
+        }
+
+        auto rock_mmesh = ChTriangleMeshConnected::CreateFromWavefrontFile(rock_obj_path, false, true);
+        rock_mmesh->Transform(ChVector3d(0, 0, 0), ChMatrix33<>(scale_ratio));  // scale to a different size
+        rock_mmesh->RepairDuplicateVertexes(1e-9);                              // if meshes are not watertight
+
+        // compute mass inertia from mesh
+        double mmass;
+        ChVector3d mcog;
+        ChMatrix33<> minertia;
+        double mdensity = 8000;  // paramsH->bodyDensity;
+        rock_mmesh->ComputeMassProperties(true, mmass, mcog, minertia);
+        ChMatrix33<> principal_inertia_rot;
+        ChVector3d principal_I;
+        ChInertiaUtils::PrincipalInertia(minertia, principal_I, principal_inertia_rot);
+
+        // set the abs orientation, position and velocity
+        auto rock_Body = chrono_types::make_shared<ChBodyAuxRef>();
+        ChQuaternion<> rock_rot = QuatFromAngleX(CH_PI / 2);
+        ChVector3d rock_pos = ChVector3d(x, y, 0);
+        rock_Body->SetFrameCOMToRef(ChFrame<>(mcog, principal_inertia_rot));
+
+        rock_Body->SetMass(mmass * mdensity);  // mmass * mdensity
+        rock_Body->SetInertiaXX(mdensity * principal_I);
+
+        rock_Body->SetFrameRefToAbs(ChFrame<>(ChVector3d(rock_pos), ChQuaternion<>(rock_rot)));
+        vehicle.GetSystem()->Add(rock_Body);
+
+        rock_Body->SetFixed(true);
+        //auto rock_ct_shape = chrono_types::make_shared<ChCollisionShapeTriangleMesh>(rockSufaceMaterial, rock_mmesh,
+        //                                                                             false, false, 0.005);
+        //rock_Body->AddCollisionShape(rock_ct_shape);
+        // for the purpose of accelerating simulation speed, since we not gonna hit big rocks, so disable collision for that
         rock_Body->EnableCollision(true);
 
         auto rock_mesh = chrono_types::make_shared<ChVisualShapeTriangleMesh>();
@@ -440,16 +508,18 @@ int main(int argc, char* argv[]) {
 
         // vehicle.GetSystem()->Add(rock_Body);
         // vehicle.GetSystem()->GetCollisionSystem()->BindItem(rock_Body);
-        // std::cout<<"done adding all the rocks"<<std::endl;
+        //std::cout<<"done adding all the rocks"<<std::endl;
     }
 
     // SCM Terrain with randomly selected terrain parameters
     SCMTerrain terrain(system);
     InitializeTerrainParameters(terrain);
-    double length = 40;
-    double width = 10;
-    // terrain.GetMesh()->SetTexture(vehicle::GetDataFile("terrain/textures/dirt.jpg"));
-    terrain.Initialize(length, width, 0.02f);
+    double length = 85;
+    double width = 85;
+    terrain.GetMesh()->SetTexture(vehicle::GetDataFile("terrain/textures/dirt.jpg"));
+    // std::string terrain_mesh_path = GetChronoDataFile("vehicle/terrain/meshes/track_veh_playground.obj");
+    // terrain.Initialize(terrain_mesh_path, 0.02f);
+    terrain.Initialize(length,width,0.02f);
     terrain.GetMesh()->SetWireframe(true);
 
     // // Rigid terrain
@@ -471,10 +541,10 @@ int main(int argc, char* argv[]) {
     // ----------------------------------------
     // add sensor
     auto sensor_manager = chrono_types::make_shared<ChSensorManager>(vehicle.GetSystem());
-    // Background b;
-    // b.mode = BackgroundMode::ENVIRONMENT_MAP;
-    // b.env_tex = GetChronoDataFile("sensor/textures/kloppenheim_06_4k.hdr");
-    // sensor_manager->scene->SetBackground(b);
+    Background b;
+    b.mode = BackgroundMode::ENVIRONMENT_MAP;
+    b.env_tex = GetChronoDataFile("sensor/textures/kloppenheim_06_4k.hdr");
+    sensor_manager->scene->SetBackground(b);
     sensor_manager->scene->AddPointLight({100, 100, 100}, {2, 2, 2}, 200);
     sensor_manager->scene->SetAmbientLight({0.1f, 0.1f, 0.1f});
     // Create a lidar and add it to the sensor manager
@@ -491,7 +561,7 @@ int main(int argc, char* argv[]) {
     //// View from behind vehicle
     // auto cam_pose = chrono::ChFrame<double>({-6.304, 0, 1.0}, QuatFromAngleAxis(0.1, {0, 1.25, 0}));
     //// Bird's eye view cam pos.
-    auto cam_pose = chrono::ChFrame<double>({0, 0, 15.0}, QuatFromAngleAxis(1.57, {0, 1, 0}));
+    auto cam_pose = chrono::ChFrame<double>({-8.0, 0, 5.0}, QuatFromAngleAxis(0.5, {0, 1, 0}));
     auto cam = chrono_types::make_shared<ChCameraSensor>(vehicle.GetChassis()->GetBody(),  // body camera is attached to
                                                          15,                               // update rate in Hz
                                                          cam_pose,                         // offset pose
@@ -504,8 +574,8 @@ int main(int argc, char* argv[]) {
     cam->SetName(" Camera ");
     cam->SetLag(lag);
     cam->SetCollectionWindow(0.0f);
-    cam->PushFilter(chrono_types::make_shared<ChFilterVisualize>(image_width, image_height, "Camera"));
-    //cam->PushFilter(chrono_types::make_shared<ChFilterSave>("./cam1/"));
+    //cam->PushFilter(chrono_types::make_shared<ChFilterVisualize>(image_width, image_height, "Camera"));
+    cam->PushFilter(chrono_types::make_shared<ChFilterSave>("./cam1/"));
     sensor_manager->AddSensor(cam);
     sensor_manager->Update();
 
@@ -559,12 +629,15 @@ int main(int argc, char* argv[]) {
         // driver->SetThrottle(0.8f);
         // driver->SetSteering(0.0f);
         // driver->SetBraking(0.0f);
-        //std::cout<<"set throttle"<<std::endl;
+        
         DriverInputs driver_inputs = driver->GetInputs();
         //std::cout<<"vehicle engine rmp:"<<vehicle.GetVehicle().GetEngine()->GetMotorSpeed()<<std::endl;
         //std::cout<<"vehicle engine torque:"<<vehicle.GetVehicle().GetEngine()->GetOutputMotorshaftTorque()<<std::endl;        
         // Update modules (process inputs from other modules)
         time = vehicle.GetSystem()->GetChTime();
+
+        std::cout<<"time: "<< time <<std::endl;
+
         driver->Synchronize(time);
         terrain.Synchronize(time);
         vehicle.Synchronize(time, driver_inputs);
