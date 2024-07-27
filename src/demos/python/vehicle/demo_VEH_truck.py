@@ -22,7 +22,7 @@ chrono.SetChronoDataPath(chrono.GetChronoDataPath())
 veh.SetDataPath(chrono.GetChronoDataPath() + 'vehicle/')
 
 # Initial vehicle location and orientation
-initLoc = chrono.ChVector3d(4, 0, 0.5)
+initLoc = chrono.ChVector3d(7, -60, 0.5)
 initRot = chrono.QuatFromAngleZ(1.57)
 # initRot = chrono.ChQuaterniond(1, 0, 0, 0)
 
@@ -36,7 +36,7 @@ tire_vis_type = veh.VisualizationType_MESH  # : VisualizationType::PRIMITIVES
 chassis_collision_type = veh.CollisionType_NONE
 
 # Type of tire model (RIGID, TMEASY)
-tire_model = veh.TireModelType_TMEASY
+tire_model = veh.TireModelType_RIGID
 
 # Rigid terrain
 # terrain_model = veh.RigidTerrain.BOX
@@ -60,12 +60,9 @@ render_step_size = 1.0 / 50  # FPS = 50
 
 # =============================================================================
 
-#print ( "Copyright (c) 2017 projectchrono.org\nChrono version: ", chrono.CHRONO_VERSION , "\n\n")
-
 # --------------
 # Create systems
 # --------------
-print('here')
 # Create the ARTcar vehicle, set parameters, and initialize
 car = veh.Kraz()
 car.SetContactMethod(contact_method)
@@ -75,7 +72,6 @@ car.SetInitPosition(chrono.ChCoordsysd(initLoc, initRot))
 car.Initialize()
 
 car.SetChassisVisualizationType(chassis_vis_type, chassis_vis_type)
-print('here')
 car.SetSteeringVisualizationType(steering_vis_type)
 car.SetSuspensionVisualizationType(suspension_vis_type, suspension_vis_type)
 car.SetWheelVisualizationType(wheel_vis_type, wheel_vis_type)
@@ -109,7 +105,7 @@ terrain.Initialize()
 # -------------------------------------
 
 vis = veh.ChWheeledVehicleVisualSystemIrrlicht()
-vis.SetWindowTitle('dart')
+vis.SetWindowTitle('truck vehicle simulation')
 vis.SetWindowSize(1280, 1024)
 vis.SetChaseCamera(trackPoint, 25.0, 1.5)
 vis.Initialize()
@@ -149,7 +145,11 @@ render_frame = 0
 
 while vis.Run() :
     time = car.GetSystem().GetChTime()
-
+    # get trailer and tractor position
+    tractor_pos = car.GetTractorChassisBody().GetPos()
+    trailer_pos = car.GetTrailer().GetChassis().GetBody().GetPos()
+    tractor_heading = car.GetTractorChassisBody().GetRot().GetCardanAnglesZYX().z
+    trailer_heading = car.GetTrailer().GetChassis().GetBody().GetRot().GetCardanAnglesZYX().z
     # Render scene and output POV-Ray data
     if (step_number % render_steps == 0) :
         vis.BeginScene()
