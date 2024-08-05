@@ -34,17 +34,19 @@ import argparse
 chrono.SetChronoDataPath(chrono.GetChronoDataPath())
 veh.SetDataPath(chrono.GetChronoDataPath() + 'vehicle/')
 
-obstacle_pos = np.loadtxt('/home/harry/chrono_fork/obs_loc.csv',delimiter=',')
+#obstacle_pos = np.loadtxt('/home/harry/chrono_fork/obs_loc.csv',delimiter=',')
+obstacle_pos = np.array([[3.945895,8.126506]])
 ind = 1
 for obs in obstacle_pos:
-    obs_x = obs[0]
-    obs_y = obs[1]
+    obs_x, obs_y = obs[0], obs[1]
+    # obs_x, obs_y = 1.997418,9.950001
 
     # Initial vehicle location and orientation
     initLoc = chrono.ChVector3d(0, 0.0, 0.5)
     # initRot = chrono.ChQuaterniond(1, 0, 0, 0)
     initRot = chrono.QuatFromAngleZ(1.57)
 
+    vis_enable = True
 
     # Output directories
     out_dir = "./trajectory"
@@ -86,7 +88,7 @@ for obs in obstacle_pos:
     contro_step_size = 1.0 / 30 # control frequency is 10 Hz
 
     ref_path = np.genfromtxt('/home/harry/waypoints_paths/corner_turn.csv',delimiter=',')
-    ref_speed = 1.0 # how fast you wanna go
+    ref_speed = 5.0 # how fast you wanna go
 
     # helper function to search reference trajectory
     def search_ref_state(current_state,lookahead=1.0):
@@ -115,9 +117,9 @@ for obs in obstacle_pos:
     car.SetInitPosition(chrono.ChCoordsysd(initLoc, initRot))
     car.SetTireType(tire_model)
     car.SetTireStepSize(tire_step_size)
-    car.SetMaxMotorVoltageRatio(0.12)
-    car.SetStallTorque(0.3)
-    car.SetTireRollingResistance(0.06)
+    car.SetMaxMotorVoltageRatio(0.3)
+    car.SetStallTorque(0.6)
+    car.SetTireRollingResistance(0.01)
 
     car.Initialize()
 
@@ -159,7 +161,8 @@ for obs in obstacle_pos:
 
     has_obstacle = True
     detect_obstacle = False
-    observable_point = [1.0, 9.6]
+    observable_point = [4.0, 9.0]
+    # observable_point = [1.0, 9.6]
     if has_obstacle:
         obstacle = [obs_x,obs_y]
         obs_pos = chrono.ChVector3d(obstacle[0], obstacle[1], 0.0)
@@ -173,16 +176,17 @@ for obs in obstacle_pos:
     # Create the driver system
     # -------------------------------------
 
-    # vis = veh.ChWheeledVehicleVisualSystemIrrlicht()
-    # vis.SetWindowTitle('dart')
-    # vis.SetWindowSize(1280, 1024)
-    # vis.SetChaseCamera(trackPoint, 3.0, 0.5)
-    # vis.Initialize()
-    # vis.AddLogo(chrono.GetChronoDataFile('logo_pychrono_alpha.png'))
-    # vis.AddLightDirectional()
-    # vis.AddSkyBox()
-    # vis.SetImageOutput(True)
-    # vis.AttachVehicle(car.GetVehicle())
+    if vis_enable:
+        vis = veh.ChWheeledVehicleVisualSystemIrrlicht()
+        vis.SetWindowTitle('dart')
+        vis.SetWindowSize(1280, 1024)
+        vis.SetChaseCamera(trackPoint, 3.0, 0.5)
+        vis.Initialize()
+        vis.AddLogo(chrono.GetChronoDataFile('logo_pychrono_alpha.png'))
+        vis.AddLightDirectional()
+        vis.AddSkyBox()
+        vis.SetImageOutput(True)
+        vis.AttachVehicle(car.GetVehicle())
 
 
     driver = veh.ChDriver(car.GetVehicle())
@@ -215,18 +219,19 @@ for obs in obstacle_pos:
     image_output = True
     vehicle_state = []
     sim_time = 0
+    is_replaned = False
     while sim_time < 25 :
         sim_time = car.GetSystem().GetChTime()
         # Render scene and output POV-Ray data
-        # if (step_number % render_steps == 0) :
-        #     vis.BeginScene()
-        #     vis.Render()
-        #     # filename = './IMG/img_' + str(render_frame + 1) +'.jpg' 
-        #     # vis.WriteImageToFile(filename)
-        #     # print("done rendering frame ", render_frame + 1)
-
-        #     vis.EndScene()
-        #     render_frame += 1
+        if vis_enable and (step_number % render_steps == 0):
+            vis.BeginScene()
+            vis.Render()
+            # filename = './IMG/img_' + str(render_frame + 1) +'.jpg' 
+            # vis.WriteImageToFile(filename)
+            # print("done rendering frame ", render_frame + 1)
+            vis.EndScene()
+            render_frame += 1
+        
         if (step_number % control_steps == 0) :
             
             # get vehicle state
@@ -244,13 +249,13 @@ for obs in obstacle_pos:
                 detect_obstacle = True
             ## perform path planning
             if has_obstacle:
-                if detect_obstacle:
+                if detect_obstacle and not is_replaned:
                     print('obstacle detected')
-                    new_ref_path = path_planning(ref_path, obstacle,magnitude=0.9,repulse_distance=3)
-                else:
-                    print('not yet planing for avoidance')
-                    new_ref_path = ref_path
-                err = error_state(new_ref_path,state,lookahead=0.7)
+                    ref_path = path_planning(ref_path, obstacle,magnitude=0.9,repulse_distance=3)
+                    np.savetxt('new_path.csv', ref_path, delimiter=',',fmt='%f')
+                    is_replaned = True
+                    print('replanned')
+                err = error_state(ref_path,state,lookahead=0.7)
             else:
                 err = error_state(ref_path,state,lookahead=0.7)
             
@@ -269,8 +274,8 @@ for obs in obstacle_pos:
 
             # prevent steering from changing too fast
             delta_steering = steering -previous_steering
-            if abs(delta_steering)>0.4:
-                steering  = previous_steering + 0.4*np.sign(delta_steering)
+            if abs(delta_steering)>0.2:
+                steering  = previous_steering + 0.2*np.sign(delta_steering)
                 print('steering limit reached')
             previous_steering = steering
             
@@ -287,13 +292,15 @@ for obs in obstacle_pos:
         driver.Synchronize(sim_time)
         terrain.Synchronize(sim_time)
         car.Synchronize(sim_time, driver_inputs, terrain)
-        #vis.Synchronize(sim_time, driver_inputs)
+        if vis_enable:
+            vis.Synchronize(sim_time, driver_inputs)
 
         # Advance simulation for one timestep for all modules
         driver.Advance(step_size)
         terrain.Advance(step_size)
         car.Advance(step_size)
-        #vis.Advance(step_size)
+        if vis_enable:
+            vis.Advance(step_size)
 
         # Increment frame number
         step_number += 1

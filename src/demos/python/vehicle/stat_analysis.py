@@ -16,14 +16,14 @@ def generate_rand_obs_loc(reference_traj,start_ind=1,end_ind=100):
     return obs_loc
 
 ref_path = np.genfromtxt('/home/harry/waypoints_paths/corner_turn.csv',delimiter=',')
-obs_loc = generate_rand_obs_loc(ref_path,106,150)
+obs_loc = generate_rand_obs_loc(ref_path,130,150)
 np.savetxt('obs_loc.csv',obs_loc,delimiter=',',fmt='%f')
 show_plots = True  
 if show_plots:
     plt.plot(ref_path[:,0],ref_path[:,1],label='Reference Path')
     plt.scatter([obs[0] for obs in obs_loc],[obs[1] for obs in obs_loc],label='Obstacle Location')
     plt.legend()
-    plt.show()
+    #plt.show()
 
 def check_traj_collision(traj, obs_loc, plot=True):
     # check if any point on trajectory is within 0.3 meters of obstacle
@@ -34,7 +34,7 @@ def check_traj_collision(traj, obs_loc, plot=True):
             break
     if plot:
         plt.plot([point[0] for point in traj],[point[1] for point in traj],label='Trajectory')
-        plt.scatter(obs_loc[0],obs_loc[1],label='Obstacle Location')
+        #plt.scatter(obs_loc[0],obs_loc[1],label='Obstacle Location')
         #plt.legend()
     return collision
         
@@ -44,7 +44,7 @@ obstacle_loc = np.genfromtxt('obs_loc.csv',delimiter=',')
 
 num_collisions = 0
 col_ind = []
-for i in range(200):
+for i in range(120):
     #print('Checking Trajectory: ',i+1)
     traj = np.genfromtxt(folder_traj+'traj_'+str(i+1)+'.csv',delimiter=',')
     
@@ -53,10 +53,12 @@ for i in range(200):
         num_collisions+=1
         col_ind.append(i)
 print('Number of Collisions: ',num_collisions)
-plt.figure()
 #plot all colliding obstacle locations using col_ind
+# plt.legend()
+plt.figure()
 for i in col_ind:
-    traj = np.genfromtxt(folder_traj+'traj_'+str(i+1)+'.csv',delimiter=',')
-    check_traj_collision(traj,obstacle_loc[i],plot=True)
-    plt.legend()
+    plt.scatter(obstacle_loc[i][0],obstacle_loc[i][1])
+    #plt.legend()
+plt.plot(ref_path[:,0],ref_path[:,1],label='Reference Path')
+plt.legend()
 plt.show()

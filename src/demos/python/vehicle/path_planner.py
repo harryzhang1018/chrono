@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
 def path_planning(ref_trajectory, obstacle, magnitude = 0.7, repulse_distance=5,lateral_clearance=0.2):
@@ -8,6 +9,7 @@ def path_planning(ref_trajectory, obstacle, magnitude = 0.7, repulse_distance=5,
 
     def repulsive_force(point, obstacle, scale=1.0):
         """ Calculate the repulsive force from the obstacle on a waypoint """
+        # print(obstacle)
         dist = distance(point, obstacle)
         if dist < repulse_distance:
             force_magnitude = scale * np.exp(-dist/10)
@@ -20,6 +22,8 @@ def path_planning(ref_trajectory, obstacle, magnitude = 0.7, repulse_distance=5,
 
     if obstacle is None:
         return ref_trajectory
+    # add small perturbation to the obstacle to avoid division by zero
+    obstacle = [obstacle[0] + np.random.uniform(-0.01,0.01), obstacle[1]+ np.random.uniform(-0.01,0.01)]
     # Calculate minimum distance from the obstacle to the reference trajectory
     min_distance = min(distance(waypoint[:2], obstacle) for waypoint in ref_trajectory)
     if min_distance < lateral_clearance:
@@ -30,15 +34,17 @@ def path_planning(ref_trajectory, obstacle, magnitude = 0.7, repulse_distance=5,
                     closest_waypoint[1] + norm_direction[1] * lateral_clearance)
     # Modify waypoints if the obstacle is close
     modified_trajectory = []
+    index_modified = []
+    start_index = 0
     for waypoint in ref_trajectory:
         if distance(waypoint[:2], obstacle) < repulse_distance:
             #print("Obstacle detected")
             modified_point = repulsive_force(waypoint[:2], obstacle,scale = magnitude)
             modified_trajectory.append([modified_point[0], modified_point[1], waypoint[2], waypoint[3]])
-        else:
-            modified_trajectory.append(waypoint)
-
-    # Update heading angles and smooth transitions
+            index_modified.append(start_index)
+        start_index += 1
+    #print('modified index:',index_modified)
+    # calculate heading for the modified trajectory
     for i in range(len(modified_trajectory) - 1):
         dx = modified_trajectory[i + 1][0] - modified_trajectory[i][0]
         dy = modified_trajectory[i + 1][1] - modified_trajectory[i][1]
@@ -46,8 +52,25 @@ def path_planning(ref_trajectory, obstacle, magnitude = 0.7, repulse_distance=5,
 
     if len(modified_trajectory) > 0:  # Update the last heading to be the same as the second last
         modified_trajectory[-1][2] = modified_trajectory[-2][2]
+        
+    truncate_lenth = 8
+    for i in range(truncate_lenth):
+        modified_trajectory[i] = modified_trajectory[truncate_lenth]
+        modified_trajectory[-1-i] = modified_trajectory[-1-truncate_lenth]
+    for i in range(len(modified_trajectory)):
+        ref_trajectory[index_modified[i]] = modified_trajectory[i]
+        
+    result_trajectory = ref_trajectory
+    # # Update heading angles and smooth transitions
+    # for i in range(len(modified_trajectory) - 1):
+    #     dx = modified_trajectory[i + 1][0] - modified_trajectory[i][0]
+    #     dy = modified_trajectory[i + 1][1] - modified_trajectory[i][1]
+    #     modified_trajectory[i][2] = np.arctan2(dy, dx)
 
-    return np.array(modified_trajectory)
+    # if len(modified_trajectory) > 0:  # Update the last heading to be the same as the second last
+    #     modified_trajectory[-1][2] = modified_trajectory[-2][2]
+
+    return np.array(result_trajectory)
 
 def error_state(ref_traj,current_state,lookahead = 1.0):
     x_current = current_state[0]
@@ -94,3 +117,17 @@ def error_state(ref_traj,current_state,lookahead = 1.0):
     error_state = [errRM[0][0],errRM[1][0],err_theta, ref_state_current[3]-v_current]
 
     return error_state
+
+def test_algo():
+    ref_trajectory = np.genfromtxt('/home/harry/transient_based_robotic_navigation/control/corner_turn.csv', delimiter=',')
+    plt.plot(ref_trajectory[:,0], ref_trajectory[:,1], label='Reference Path')
+    obstacle = [3.800000,7.599841]
+    new_path = path_planning(ref_trajectory, obstacle,magnitude=0.9,repulse_distance=3)
+    np.savetxt('new_path.csv', new_path, delimiter=',',fmt='%f')
+    
+    plt.plot(new_path[:,0], new_path[:,1], label='New Path')
+    plt.scatter(obstacle[0], obstacle[1], color='red', label='Obstacle')
+    plt.legend()
+    plt.show()
+
+# test_algo()
