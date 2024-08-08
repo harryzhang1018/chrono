@@ -85,9 +85,9 @@ for obs in obstacle_pos:
 
     # Time interval between two render frames
     render_step_size = 1.0 / 25  # FPS = 25
-    contro_step_size = 1.0 / 30 # control frequency is 10 Hz
+    contro_step_size = 1.0 / 20 # control frequency is 10 Hz
 
-    ref_path = np.genfromtxt('/home/harry/waypoints_paths/corner_turn.csv',delimiter=',')
+    ref_path = np.genfromtxt('./midwpts.csv',delimiter=',')
     ref_speed = 5.0 # how fast you wanna go
 
     # helper function to search reference trajectory
