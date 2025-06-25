@@ -24,6 +24,10 @@ try:
 except:
     pass
 try:
+    import _vsg
+except:
+    pass
+try:
     import _fsi
 except:
     pass
