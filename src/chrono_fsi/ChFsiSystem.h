@@ -71,15 +71,9 @@ class CH_FSI_API ChFsiSystem {
     void SetStepsizeMBD(double step);
 
     /// Add a rigid body to the FSI system.
-    /// BCE markers are created based on the provided geometry.
-    std::shared_ptr<FsiBody> AddFsiBody(std::shared_ptr<ChBody> body,
-                                        std::shared_ptr<ChBodyGeometry> geometry,
-                                        bool check_embedded);
-
-    /// Add an FEA mesh to the FSI system.
-    /// Any SegmentSet contact surfaces already defined for the FEA mesh are used to generate the interface between the
-    /// solid and fluid phases. If none are defined, one contact surface is created, but it is not attached to the FEA mesh.
-    std::shared_ptr<FsiMesh1D> AddFsiMesh1D(std::shared_ptr<fea::ChMesh> mesh, bool check_embedded);
+    /// If geometry=nullptr, it is assumed that the interaction geometry is provided separately.
+    /// Returns the index of the FSI body in the internal list.
+    size_t AddFsiBody(std::shared_ptr<ChBody> body, std::shared_ptr<ChBodyGeometry> geometry = {});
 
     /// Add an FEA mesh to the FSI system.
     /// Any TriMesh contact surfaces already defined for the FEA mesh are used to generate the interface between the
