@@ -1011,7 +1011,7 @@ void ChVisualSystemIrrlicht::PopulateIrrNode(ISceneNode* node,
                 double rad = cone->GetRadius();
                 double height = cone->GetHeight();
 
-                core::vector3df irrsize((irr::f32)rad, (irr::f32)rad, (irr::f32)(height / 2));
+                core::vector3df irrsize((irr::f32)rad, (irr::f32)rad, (irr::f32)height);
                 mchildnode->setScale(irrsize);
                 mchildnode->setPosition(shape_m4.getTranslation());
                 mchildnode->setRotation(shape_m4.getRotationDegrees());

@@ -38,13 +38,11 @@ double ChCylinder::GetVolume() const {
 }
 
 ChMatrix33<> ChCylinder::GetGyration(double radius, double height) {
-    double Ixx = (1.0 / 12.0) * (3 * radius * radius + height * height);
-
     ChMatrix33<> J;
     J.setZero();
-    J(0, 0) = Ixx;
-    J(1, 1) = Ixx;
-    J(2, 2) = (1.0 / 2.0) * (radius * radius);
+    J(0, 0) = (1.0 / 12.0) * (3 * radius * radius + height * height);
+    J(1, 1) = (1.0 / 2.0) * (radius * radius);
+    J(2, 2) = (1.0 / 12.0) * (3 * radius * radius + height * height);
 
     return J;
 }

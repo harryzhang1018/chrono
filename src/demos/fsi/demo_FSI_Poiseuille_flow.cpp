@@ -105,8 +105,10 @@ int main(int argc, char* argv[]) {
     ground->EnableCollision(false);
     sysMBS.AddBody(ground);
 
-    auto ground_bce = sysSPH.CreatePointsBoxContainer(ChVector3d(bxDim, byDim, bzDim), {0, 0, 2});
-    sysFSI.AddFsiBody(ground, ground_bce, ChFrame<>(ChVector3d(0, 0, bzDim / 2), QUNIT), false);
+    sysSPH.AddBoxContainerBCE(ground,                                         //
+                              ChFrame<>(ChVector3d(0, 0, bzDim / 2), QUNIT),  //
+                              ChVector3d(bxDim, byDim, bzDim),                //
+                              ChVector3i(0, 0, 2));
 
     // Complete construction of the fluid system
     sysFSI.Initialize();

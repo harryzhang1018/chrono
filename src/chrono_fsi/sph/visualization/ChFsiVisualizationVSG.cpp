@@ -12,8 +12,6 @@
 // Authors: Radu Serban
 // =============================================================================
 
-#include <algorithm>
-
 #include "chrono/assets/ChVisualShapeSphere.h"
 #include "chrono/assets/ChVisualShapeBox.h"
 
@@ -208,11 +206,6 @@ ChFsiVisualizationVSG::ChFsiVisualizationVSG(ChFsiFluidSystemSPH* sysSPH)
 }
 
 ChFsiVisualizationVSG::~ChFsiVisualizationVSG() {
-    auto& systems = m_vsys->GetSystems();
-    auto index = std::find(systems.begin(), systems.end(), m_sysMBS);
-    if (index != systems.end())
-        systems.erase(index);
-
     delete m_sysMBS;
 }
 
@@ -350,7 +343,7 @@ void ChFsiVisualizationVSG::OnBindAssets() {
 
     // Loop over all FSI bodies and bind a model for its active box
     for (const auto& fsi_body : m_sysFSI->GetBodies())
-        BindActiveBox(fsi_body->body, fsi_body->body->GetTag());
+        BindActiveBox(fsi_body.body, fsi_body.body->GetTag());
 }
 
 void ChFsiVisualizationVSG::SetActiveBoxVisibility(bool vis, int tag) {

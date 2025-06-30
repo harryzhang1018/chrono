@@ -63,10 +63,7 @@ float render_fps = 1000;
 // Create the objects of the MBD system. Rigid bodies, and if fsi, their
 // bce representation are created and added to the systems
 //------------------------------------------------------------------
-void CreateSolidPhase(ChFsiSystemSPH& sysFSI) {
-    auto& sysMBS = sysFSI.GetMultibodySystem();
-    auto& sysSPH = sysFSI.GetFluidSystemSPH();
-
+void CreateSolidPhase(ChSystemSMC& sysMBS, ChFsiFluidSystemSPH& sysSPH) {
     // Ground body
     auto ground = chrono_types::make_shared<ChBody>();
     ground->SetFixed(true);
@@ -74,8 +71,10 @@ void CreateSolidPhase(ChFsiSystemSPH& sysFSI) {
     sysMBS.AddBody(ground);
 
     // Container BCE markers
-    auto bce = sysSPH.CreatePointsBoxContainer(ChVector3d(bxDim, byDim, bzDim), {2, 2, -1});
-    sysFSI.AddFsiBody(ground, bce, ChFrame<>(ChVector3d(0, 0, bzDim / 2), QUNIT), false);
+    sysSPH.AddBoxContainerBCE(ground,                                         //
+                              ChFrame<>(ChVector3d(0, 0, bzDim / 2), QUNIT),  //
+                              ChVector3d(bxDim, byDim, bzDim),                //
+                              ChVector3i(2, 2, -1));
 }
 
 // =============================================================================
@@ -120,7 +119,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Create MBD and BCE particles for the solid domain
-    CreateSolidPhase(sysFSI);
+    CreateSolidPhase(sysMBS, sysSPH);
     sysSPH.SetInitPressure(fzDim);
 
     // Complete construction of the FSI system

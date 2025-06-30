@@ -39,26 +39,13 @@ defines the Python function return ($result) from the C++ args ($1, $2...)
     delete($1);
 %}
 
-// version handling
-#if SWIG_VERSION >= 0x040300
-  // SWIG 4.3.0+ use a new three argument form with $isvoid flag
-  %typemap(argout) (double* p, int len) {
+%typemap(argout) (double* p, int len) {
     PyObject* list = PyList_New($2);
-    for (int i = 0; i < $2; ++i) {
+    int i;
+    for(i = 0; i < $2; ++i)
         PyList_SET_ITEM(list, i, PyFloat_FromDouble($1[i]));
-    }
-    $result = SWIG_Python_AppendOutput($result, list, $isvoid);
-  }
-#else
-  // SWIG < 4.3.0 fall back to the older AppendOutput form
-  %typemap(argout) (double* p, int len) {
-    PyObject* list = PyList_New($2);
-    for (int i = 0; i < $2; ++i) {
-        PyList_SET_ITEM(list, i, PyFloat_FromDouble($1[i]));
-    }
     $result = SWIG_Python_AppendOutput($result, list);
-  }
-#endif
+}
 
 %typemap(in) (int numel, double* q) %{
     if (PyList_Check($input)) {
@@ -94,26 +81,13 @@ defines the Python function return ($result) from the C++ args ($1, $2...)
     delete($1);
 %}
 
-#if SWIG_VERSION >= 0x040300
-  // SWIG 4.3.0+ use a new three argument form with $isvoid flag
-  %typemap(argout) (int* p, int len) {
+%typemap(argout) (int* p, int len) {
     PyObject* list = PyList_New($2);
-    for (int i = 0; i < $2; ++i) {
-      PyList_SET_ITEM(list, i, PyLong_FromLong($1[i]));
-    }
-    $result = SWIG_Python_AppendOutput($result, list, $isvoid);
-  }
-#else
-  // SWIG < 4.3.0 fall back to the older AppendOutput form
-  %typemap(argout) (int* p, int len) {
-    PyObject* list = PyList_New($2);
-    for (int i = 0; i < $2; ++i) {
-      PyList_SET_ITEM(list, i, PyLong_FromLong($1[i]));
-    }
+    int i;
+    for(i = 0; i < $2; ++i)
+        PyList_SET_ITEM(list, i, PyLong_FromLong($1[i]));
     $result = SWIG_Python_AppendOutput($result, list);
-  }
-#endif
-
+}
 
 
 %typemap(in) (int numel, int* q) %{

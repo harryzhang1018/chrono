@@ -166,8 +166,6 @@ add_library(Chrono_synchrono
 )
 add_library(Chrono::synchrono ALIAS Chrono_synchrono)
 
-set_target_properties(Chrono_synchrono PROPERTIES DEBUG_POSTFIX ${CH_DEBUG_POSTFIX})
-
 if(CH_WHOLE_PROG_OPT)
   set_target_properties(Chrono_synchrono PROPERTIES COMPILE_FLAGS "/GL")
   set_target_properties(Chrono_synchrono PROPERTIES LINK_FLAGS "/LTCG")

@@ -286,23 +286,23 @@ inline real3 GetSupportPoint_Plane(const real3& B, const real3& n) {
 }
 
 /// Support point for a cone (for GJK and MPR).
-/// Cone assumed to be along Z axis with origin at axis midpoint.
+/// Cone assumed to be along Z axis with origing at base center.
 inline real3 GetSupportPoint_Cone(const real3& B, const real3& n) {
     const real& radius = B.x;
-    const real& hheight = B.z;
+    const real& height = B.y;
 
     // If direction close to cone axis, support point at apex
-    real sinAngle = (radius / Sqrt(radius * radius + 4 * hheight * hheight));
+    real sinAngle = (radius / Sqrt(radius * radius + height * height));
     if (n.z > Length(n) * sinAngle)
-        return real3(0, 0, hheight);
+        return real3(0, 0, height);
 
     // If direction along cone axis downwards, support point at center of base
     real s = Sqrt(n.x * n.x + n.y * n.y);
     if (s < 1e-9)
-        return real3(0, 0, -hheight);
+        return real3(0, 0, 0);
 
     // Support point on base circumference
-    return real3(n.x * radius / s, n.y * radius / s, -hheight);
+    return real3(n.x * radius / s, n.y * radius / s, 0);
 }
 
 /// Support point for a line segment (for GJK and MPR).

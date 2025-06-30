@@ -1092,7 +1092,7 @@ ChFramed ChParserYAML::ReadJointFrame(const YAML::Node& a) {
             ChAssertAlways(a["axis"]);
             auto axis = ReadVector(a["axis"]);
             axis.Normalize();
-            ChMatrix33d R;
+            ChMatrix33 R;
             R.SetFromAxisZ(axis);
             rot = R.GetQuaternion();
             break;
