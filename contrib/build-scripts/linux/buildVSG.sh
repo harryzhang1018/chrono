@@ -91,7 +91,7 @@ echo "  "  ${ASSIMP_SOURCE_DIR}
 # ------------------------------------------------------------------------
 
 rm -rf ${VSG_INSTALL_DIR}
-mkdir ${VSG_INSTALL_DIR}
+mkdir -p ${VSG_INSTALL_DIR}
 
 # --- assimp -------------------------------------------------------------
 
