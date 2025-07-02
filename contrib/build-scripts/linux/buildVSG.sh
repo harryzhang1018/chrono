@@ -56,7 +56,7 @@ then
     echo "Download sources from GitHub"
 
     rm -rf download_vsg
-    mkdir download_vsg
+    mkdir -p download_vsg
 
     echo "  ... VulkanSceneGraph"
     git clone -c advice.detachedHead=false --depth 1 --branch v1.1.4 "https://github.com/vsg-dev/VulkanSceneGraph" "download_vsg/vsg"
@@ -91,7 +91,7 @@ echo "  "  ${ASSIMP_SOURCE_DIR}
 # ------------------------------------------------------------------------
 
 rm -rf ${VSG_INSTALL_DIR}
-mkdir ${VSG_INSTALL_DIR}
+mkdir -p ${VSG_INSTALL_DIR}
 
 # --- assimp -------------------------------------------------------------
 
