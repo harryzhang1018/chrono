@@ -53,7 +53,7 @@ then
     CONSOLE_BRIDGE_SOURCE_DIR="download_urdf/console_bridge"
 
     echo "  ... urdfdom_headers"
-    git clone "https://github.com/ros/urdfdom_headers.git" "download_urdf/urdfdom_headers"
+    git clone "https://github.com/ros/urdfdom_headers.git" -b humble "download_urdf/urdfdom_headers"
     URDFDOM_HEADERS_SOURCE_DIR="download_urdf/urdfdom_headers"
     
     echo "  ... urdfdom"
