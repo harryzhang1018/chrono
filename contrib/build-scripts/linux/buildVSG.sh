@@ -104,7 +104,8 @@ cmake -G "${BUILDSYSTEM}" -B build_assimp -S ${ASSIMP_SOURCE_DIR} \
       -DASSIMP_BUILD_TESTS:BOOL=OFF  \
       -DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF \
       -DASSIMP_BUILD_ZLIB:BOOL=ON \
-      -DASSIMP_BUILD_DRACO:BOOL=ON
+      -DASSIMP_BUILD_DRACO:BOOL=ON \
+      -DASSIMP_WARNINGS_AS_ERRORS=OFF \
 
 echo -e "\n------------------------ Build and install assimp\n"
 cmake --build build_assimp --config Release
