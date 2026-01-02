@@ -98,10 +98,11 @@ using namespace chrono::fea;
 #define EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 #define CH_DEPRECATED(msg)
 
-#ifdef SWIGCSHARP  // --------------------------------------------------------------------- CSHARP
-// I'm not certain if this is a python issue also, so wrap only for csharp for now
 // Stop SWIG from generating a baked literal for the __FILENAME__ macro
+// This affects both Python and C# bindings
 %ignore __FILENAME__;
+
+#ifdef SWIGCSHARP  // --------------------------------------------------------------------- CSHARP
 %inline %{
 // if needed there can be a pinvoke func instead of a broken char constant that SWIG produces from the macro
 inline const char* ChUtils_GetFilename() {
