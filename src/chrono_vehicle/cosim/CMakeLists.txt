@@ -75,6 +75,13 @@ if(CH_ENABLE_MODULE_FSI_SPH)
   set(CV_COSIM_TERRAIN_FILES ${CV_COSIM_TERRAIN_FILES}
       terrain/ChVehicleCosimTerrainNodeGranularSPH.h
       terrain/ChVehicleCosimTerrainNodeGranularSPH.cpp)
+  if(CHRONO_HIP_FOUND)
+    # ChVehicleCosimTerrainNodeGranularSPH.cpp includes SphUtilsPrint.cuh, which pulls in
+    # <thrust/device_vector.h> and transitively the rocThrust/rocPRIM device headers; those
+    # do not compile as plain C++ (same treatment as FSISPH_GPU_SOURCE_FILES and
+    # ChSphVisualizationVSG.cpp). Compile it with the HIP compiler instead.
+    set_source_files_properties(terrain/ChVehicleCosimTerrainNodeGranularSPH.cpp PROPERTIES LANGUAGE HIP)
+  endif()
 endif()
 
 if(CH_ENABLE_MODULE_DEM)
@@ -168,6 +175,19 @@ if(CH_ENABLE_MODULE_FSI_SPH)
 endif()
 if(CH_ENABLE_MODULE_DEM)
   target_link_libraries(Chrono_vehicle_cosim PUBLIC Chrono_dem)
+endif()
+
+if(CH_ENABLE_MODULE_FSI_SPH AND CHRONO_HIP_FOUND)
+  # Mixed CXX/HIP sources in this target can leak HIP_ARCHITECTURES into ordinary CXX
+  # compilations (same issue worked around for Chrono_fsisph). Keep the target-level
+  # property disabled and pass the GPU arch flags only to the real HIP translation unit.
+  set_target_properties(Chrono_vehicle_cosim PROPERTIES HIP_ARCHITECTURES OFF)
+  if(NOT CHRONO_HIP_ARCHITECTURES STREQUAL "")
+    foreach(_chrono_hip_arch IN LISTS CHRONO_HIP_ARCHITECTURES)
+      target_compile_options(Chrono_vehicle_cosim PRIVATE $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=${_chrono_hip_arch}>)
+      target_link_options(Chrono_vehicle_cosim PRIVATE $<$<LINK_LANGUAGE:HIP>:--offload-arch=${_chrono_hip_arch}>)
+    endforeach()
+  endif()
 endif()
 
 if(CH_ENABLE_MODULE_PARDISO_MKL)

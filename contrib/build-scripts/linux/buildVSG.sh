@@ -32,7 +32,7 @@ VSG_INSTALL_DIR="$HOME/Packages/vsg"
 
 BUILDSHARED=ON
 BUILDDEBUG=ON
-BUILDSYSTEM="Ninja Multi-Config"
+BUILDSYSTEM="Unix Makefiles"
 
 if [ ${DOWNLOAD} = OFF ]
 then
