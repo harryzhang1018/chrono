@@ -36,7 +36,13 @@ function(build_pyutests ADD_TESTS TESTS LIBS)
 				WORKING_DIRECTORY "${MY_WORKING_DIR}"
 			)
 
-			set_tests_properties(${PROGRAM} PROPERTIES ENVIRONMENT "PYTHONPATH=${_pythonpath}")
+			# PYTEST_DISABLE_PLUGIN_AUTOLOAD keeps pytest from loading the setuptools entry-point
+			# plugins installed in the environment. These tests use only built-in pytest features,
+			# and a single incompatible third-party plugin (for instance ROS 2 launch_testing, whose
+			# hooks still use the py.path argument removed in pytest 8) aborts every pytest run
+			# before collection.
+			set_tests_properties(${PROGRAM} PROPERTIES
+				ENVIRONMENT "PYTHONPATH=${_pythonpath};PYTEST_DISABLE_PLUGIN_AUTOLOAD=1")
 		endif()
 	endforeach()
 
