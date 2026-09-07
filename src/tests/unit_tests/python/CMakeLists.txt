@@ -5,10 +5,12 @@ if(NOT Python3_EXECUTABLE)
 endif()
 
 function(build_pyutests ADD_TESTS TESTS LIBS)
-	# A hack to set the working directory in which to execute the CTest runs.
-	# This is needed for tests that need to access the Chrono data directory (since we use a relative path to it)
-	if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-		set(MY_WORKING_DIR "${EXECUTABLE_OUTPUT_PATH}/Release")
+	# Set the working directory in which to execute the CTest runs.
+	# This is needed for tests that need to access the Chrono data directory (since we use a relative path to it).
+	# With a multi-config generator, executables are placed in a per-configuration subdirectory.
+	get_property(_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+	if(_is_multi_config)
+		set(MY_WORKING_DIR "${EXECUTABLE_OUTPUT_PATH}/$<CONFIG>")
 	else()
 		set(MY_WORKING_DIR "${EXECUTABLE_OUTPUT_PATH}")
 	endif()
@@ -31,13 +33,10 @@ function(build_pyutests ADD_TESTS TESTS LIBS)
 			add_test(
 				NAME ${PROGRAM}
 				COMMAND "${Python3_EXECUTABLE}" -m pytest "${CMAKE_CURRENT_SOURCE_DIR}/${PROGRAM}.py"
+				WORKING_DIRECTORY "${MY_WORKING_DIR}"
 			)
 
-			set_tests_properties(${PROGRAM} PROPERTIES WORKING_DIRECTORY "${MY_WORKING_DIR}")
-			set_tests_properties(${PROGRAM} PROPERTIES
-				WORKING_DIRECTORY "${MY_WORKING_DIR}"
-				ENVIRONMENT "PYTHONPATH=${_pythonpath}"
-			)
+			set_tests_properties(${PROGRAM} PROPERTIES ENVIRONMENT "PYTHONPATH=${_pythonpath}")
 		endif()
 	endforeach()
 
